@@ -1,0 +1,131 @@
+<?xml version = "1.0" encoding = "utf-8" ?>
+
+<Script>
+  <Description>Adds ICW survey to the baseline</Description>
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter>
+    <Name>strSurvey</Name>
+    <Type>string</Type>
+    <Source>survey</Source>
+    <Alias>Survey to add to baseline:</Alias>
+    <Default>IMP-ICW.*</Default>
+  </Parameter>
+
+  <Commands>
+
+    <!--
+    ##################################################################################################
+    Input:
+      Survey:           Imported survey name (as parameter)
+
+    Output:
+      Survey Name:      Imported survey name with IMP- prefix replaced with BAS-
+      Survey Type:      Baseline ICW
+      Channels:         Twist 14m
+
+    ##################################################################################################
+    -->
+
+    bolHasWildcards = script.Call ("BPS-F-CheckForWildcards.spf", strSurvey)
+    control.GoToIf ("$bolHasWildcards", "End")
+
+	<!-- Check survey is an imported or processed AK survey -->
+
+    test.FailIfNotMatch (strSurvey, "^(IMP|PRO)-ICW_[0-9]+_[0-9]{8}$", "", "Survey must be an imported AK survey.")
+
+	<!-- Baseline survey name, type and channels -->
+
+	strBaselineSurvey = string.ReplaceRegex (strSurvey, "^(IMP|PRO)-", "BAS-")
+	strBaselineSurveyType = string.Append ("Baseline ICW")
+    strTwistChannel = string.Append ("Twist 14m")
+
+	<!-- Attribute Names -->
+
+	strLengthAttrName = string.Append ("Length")
+
+    <!--
+    ##################################################################################################
+    Initialise
+    ##################################################################################################
+	-->
+
+    uniMetre = unit.GetUnit ("Metric", "metre")
+
+    <!-- Formulas -->
+
+    forToday = formula.Create ("CurrentDate")
+    datToday = formula.Evaluate (forToday, , "date")
+
+	<!-- Define filter to keep events greater than 50m long -->
+
+	filGT50 = filter.CreateGreaterThanFilter (50.0)
+	atrFilLengthGT50 = filter.CreateAttributeFilter (strLengthAttrName, filGT50)
+	evtFilLengthGT50 = filter.CreateEventValueFilter (atrFilLengthGT50)
+
+    <!--
+    ##################################################################################################
+       Processing Step 2 
+       a. Load Curvature and LTop channels 
+       b. Remove Flat lines 
+       c. Create Versine from GIS 
+       d. Align Curvature to Versine from GIS 
+    ##################################################################################################
+	-->
+
+	datSurvey = survey.GetDate (strSurvey)
+
+    srmTwist = stream.Load (strSurvey, strTwistChannel)
+
+    <!--
+    ##################################################################################################
+       Processing Step 3 -  
+       a. Delete any old references to this survey in the current baseline
+       b. Load the aggregated baseline covering the given survey  
+       c. Subtract any existing areas of baseline from the new baseline - this leaves just the bits that were not defined before
+    ##################################################################################################
+	-->
+
+    survey.Delete (strBaselineSurvey)
+
+    lstChannels = collection.ListCreate (strTwistChannel)
+	lstTypes = collection.ListCreate (strBaselineSurveyType)
+
+    estTwist = stream.ToEvents (srmTwist)
+    mapBaselineTwist = stream.LoadAggregatedByDate (lstChannels, lstTypes, estTwist, datToday, "LatestSurveyOnOrBeforeDate")
+    srmBaselineTwist = collection.MapGet (mapBaselineTwist, strTwistChannel)
+
+    estExistingBaseline = stream.ToEvents (srmBaselineTwist)
+    estExistingBaseline = event.RemoveAllAttributes (estExistingBaseline)
+
+    estNewBaseline = event.Subtract (estTwist, estExistingBaseline)
+
+    <!-- Strip out any sections less than 50 meters. This prevents many minute sections being considered.
+         Separate events so each event has a single location otherwise length is length of all locations -->
+
+    estNewBaseline = event.Separate (estNewBaseline)
+    estNewBaseline = event.SetAttributeToLength (estNewBaseline, strLengthAttrName, uniMetre)
+    estNewBaseline = event.Filter (estNewBaseline, evtFilLengthGT50)
+    estNewBaseline = event.RemoveAllAttributes (estNewBaseline)
+
+	<!-- Trim the channels to the events defining the extent of the baseline -->
+
+    srmTwist = stream.Trim (srmTwist, estNewBaseline)
+
+    <!--
+    ##################################################################################################
+    Processing Step 6 - Save 
+    ##################################################################################################
+	-->
+
+	mapBaselineSurvey = collection.MapCreate ()
+	collection.MapPut (mapBaselineSurvey, strTwistChannel, srmTwist)
+
+	survey.Save (strBaselineSurvey, datSurvey, strBaselineSurveyType, mapBaselineSurvey)
+    security.GrantSurveyAccess (strBaselineSurvey, "Power User", "RWD")
+
+	End:
+
+  </Commands>
+</Script>

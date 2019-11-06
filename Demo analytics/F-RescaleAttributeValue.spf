@@ -1,0 +1,140 @@
+﻿<?xml version = "1.0" encoding = "utf-8" ?>
+
+<Function logged = "false">
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Description>
+    F-RescaleAttributeValue function allows to scale an attribute (strAttributeToScale) value
+    to ranges given as an ordered from min to max list of thresholds (lstThresholdAttrNames).
+    It generates events with attribute (defined as strSclaedValueAttribute) holding scaled values
+    calculated as follows
+    <![CDATA[
+    for a Value of AttributeToScale and  threshold_0… threshold_n  from lstThresholdAttrNames
+
+    if abs(Value)> abs(threshold_n ), then scaledValue=N
+
+    if abs(threshold_(n-1) ) < abs(Value) < abs(threshold_n), then
+    
+    scaledValue = N + (abs(Value)-abs(threshold_(n-1)) )/(abs(threshold_n)-(threshold_(n-1)))
+    ]]>
+
+    *** Parameters ***
+    - estInput - A set of events each containing strAttributeToScale holding numeric values to be scaled
+    and attributes holding thresholds used in calculations supplied as the lstThresholdAttrNames list
+    - lstThresholdAttrNames - A list of attribute names holding numeric thresholds to be used in the calculations
+    The list must be ordered from min to max threshold.
+    - strAttributeToScale - The event attribute name which holds the values to be scaled
+    - strSclaedValueAttribute - The name of the attribute to hold the calculated scaled values.
+
+    *** Returns ***
+    A copy of the input event set containing attribute holding calculated scaled values.
+
+  </Description>
+
+  <Parameter>
+    <Name>estInput</Name>
+    <Type>eventSet</Type>
+  </Parameter>
+
+  <Parameter>
+    <Name>lstThresholdAttrNames</Name>
+    <Type>list</Type>
+  </Parameter>
+
+  <Parameter>
+    <Name>strAttributeToScale</Name>
+    <Type>string</Type>
+  </Parameter>
+
+  <Parameter>
+    <Name>strLevelAttrName</Name>
+    <Type>string</Type>
+  </Parameter>
+
+  <Result>
+    <Name>estResult</Name>
+    <Type>eventSet</Type>
+  </Result>
+
+  <Commands>
+    filEqualNaN = filter.CreateEqualsFilter (NaN)
+    attFilValueNaN = filter.CreateAttributeFilter (strAttributeToScale, filEqualNaN)
+    evtFilValueNaN = filter.CreateEventValueFilter (attFilValueNaN)
+
+    filNotNaN = filter.CreateNotFilter (filEqualNaN)
+    attFilValueNotNaN = filter.CreateAttributeFilter (strAttributeToScale, filNotNaN)
+    evtFilValueNotNaN = filter.CreateEventValueFilter (attFilValueNotNaN)
+
+    estInputNaN = event.Filter (estInput, evtFilValueNaN)
+    estInputNaN = event.SetAttribute (estInputNaN, strLevelAttrName, NaN)
+
+    estInput = event.Filter (estInput, evtFilValueNotNaN)
+    estInput = event.SetAttribute (estInput, strLevelAttrName, -1.0)
+
+    filLT0 = filter.CreateLessThanFilter (0.0)
+    attFilLevelLT0 = filter.CreateAttributeFilter (strLevelAttrName, filLT0)
+    evtFilLevelLT0 = filter.CreateEventValueFilter (attFilLevelLT0)
+
+    filGe0 = filter.CreateNotFilter (filLT0)
+    attFilLevelGE0 = filter.CreateAttributeFilter (strLevelAttrName, filGe0)
+    evtFilLevelGE0 = filter.CreateEventValueFilter (attFilLevelGE0)
+
+    maxLevel = collection.Size(lstThresholdAttrNames)
+    intLevel = util.Assign (maxLevel)
+    forNextLevel = formula.Create("$intLevel - 1")
+    estResult = event.CreateEmptyEventSet ()
+    strPrevLevelAttrName = util.Assign("")
+
+    intIndex = util.Assign (0)
+    forNextIndex = formula.Create("$intIndex + 1")
+
+    intLevel = formula.Evaluate(forNextLevel, , "integer")
+
+    strThresholdAttrName = collection.ListGet(lstThresholdAttrNames, intLevel)
+    strFormulaLevel = string.Format ("abs ('%s')-abs('%s')", strAttributeToScale, strThresholdAttrName)
+    forLevel = formula.Create (strFormulaLevel)
+    estInputWithLevel = event.CalculateAttribute (estInput, forLevel, strLevelAttrName, "Double")
+    estThreshold  = event.Filter (estInputWithLevel, evtFilLevelGE0)
+    estResult = event.SetAttribute (estThreshold, strLevelAttrName, 4.0)
+    estInput = event.Filter (estInputWithLevel, evtFilLevelLT0)
+    strPrevThresholdAttrName = util.Assign(strThresholdAttrName)
+
+    loopBegin:
+    intLevel = formula.Evaluate(forNextLevel, , "integer")
+
+    <![CDATA[control.GoToIf("$intLevel < 0", "loopEnd") ]]>
+    strThresholdAttrName = collection.ListGet(lstThresholdAttrNames, intLevel)
+    strFormulaLevel = string.Format ("(abs ('%s')-abs('%s')) / (abs('%s')-abs('%s'))", strAttributeToScale, strThresholdAttrName, strPrevThresholdAttrName, strThresholdAttrName)
+    forLevel = formula.Create (strFormulaLevel)
+    strFormulaLevelPlus = string.Format ("1+ %d + '%s'", intLevel, strLevelAttrName)
+    forLevelPlus = formula.Create (strFormulaLevelPlus)
+
+    estInputWithLevel = event.CalculateAttribute (estInput, forLevel, strLevelAttrName, "Double")
+    estThreshold  = event.Filter (estInputWithLevel, evtFilLevelGE0)
+    estThreshold = event.CalculateAttribute (estThreshold, forLevelPlus, strLevelAttrName, "Double")
+    estInput = event.Filter (estInputWithLevel, evtFilLevelLT0)
+
+    estResult = event.Add (estResult, estThreshold)
+    strPrevThresholdAttrName = util.Assign(strThresholdAttrName)
+    intIndex = formula.Evaluate(forNextIndex, , "integer")
+
+    control.GoTo("loopBegin")
+    loopEnd:
+    strFormulaLevel = string.Format ("(abs ('%s')) / (abs('%s'))", strAttributeToScale, strThresholdAttrName)
+    forLevel = formula.Create (strFormulaLevel)
+    estZeroLevel = event.CalculateAttribute (estInput, forLevel, strLevelAttrName, "Double")
+
+    estResult = event.Add (estInputNaN, estResult)
+    estResult = event.Add (estZeroLevel, estResult)
+
+    strRoundValue = string.Format ("round ('%s'* 100.0)/100.0 ", strAttributeToScale)
+    forRoundValue = formula.Create (strRoundValue)
+    strRoundLevel = string.Format ("round ('%s'* 100.0)/100.0 ", strLevelAttrName)
+    forRoundLevel = formula.Create (strRoundLevel)
+
+    estResult = event.CalculateAttribute (estResult, forRoundValue, strAttributeToScale, "double")
+    estResult = event.CalculateAttribute (estResult, forRoundLevel, strLevelAttrName, "double")
+
+  </Commands>
+</Function>

@@ -1,0 +1,276 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Script>
+  <Version>1.1</Version>
+  <Description>Creates ARTC segmentation for a corridor</Description>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter required = "True">
+    <Name>strCorridor</Name>
+    <Type>string</Type>
+    <Source>corridor</Source>
+    <Alias>Corridor</Alias>
+  </Parameter>
+
+  <Commands>
+
+    <!--
+    ##################################################################################################
+    Initialise
+    ##################################################################################################
+    -->
+
+	<!-- Segment event category, types and attributes -->
+
+	strSegmentCategory = string.Append ("Segment")
+	str20mBinType = string.Append ("20m Bin")
+	str50mBinType = string.Append ("50m Bin")
+    strBasecodeType = string.Append ("Basecode")
+	strCurveAndTangentType = string.Append ("Curves &amp; Tangents")
+    strLineSegmentType = string.Append ("Line Segment")
+    strPricingZoneType = string.Append ("Pricing Zone")
+    strProvisioningCentreType = string.Append ("Provisioning Centre")
+
+	strNameAttrName = string.Append ("Name")
+	strTrackAttrName = string.Append ("Track")
+
+	<!-- Line segment event category and attributes -->
+
+    strLineSegmentCategory = string.Append ("Line Segment")
+
+    strBasecodeAttrName = string.Append ("Basecode")
+    strLineSegmentAttrName = string.Append ("Line Segment")
+    strPricingZoneAttrName = string.Append ("Pricing Zone")
+    strProvisioningCentreAttrName = string.Append ("Provisioning Centre")
+
+	<!-- Design curve event categories and types -->
+
+	strArcCategory = string.Append ("Design Curve (Arc)")
+	strArcType = string.Append ("Arc")
+
+	strTransitionCategory = string.Append ("Design Curve (Transition)")
+	strTransitionType = string.Append ("Transition")
+
+	<!-- Define units -->
+
+	uniMetre = unit.GetUnit ("Metric", "metre")
+
+    <!--
+    ##################################################################################################
+    Step 1 - Load data and create base event set
+	  a. Load line segment data
+	  b. Create event set covering all tracks on the corridor
+    ##################################################################################################
+    -->
+
+	<!-- Load line segment event set -->
+
+	estOriginalLineSegments = event.LoadByCorridor (strLineSegmentCategory, , , strCorridor)
+
+	<!-- Create event set covering all tracks on the corridor -->
+
+	estTracks = event.CreateRangeEventsFromMarkers (strCorridor, , , , , uniMetre, )
+	estTracks = event.SetAttributeToTrackNames (estTracks, strTrackAttrName)
+	estTracks = event.MergeWithinDistance (estTracks, 1.0, uniMetre)
+
+    <!--
+    ##################################################################################################
+    Step 2 - Create segment types
+	  a. Create 20m bins, join those less than 2m long with previous bin
+	  b. Create 50m bins, join those less than 5m long with previous bin
+	  c. Create curve and tangent segments:
+         1. Load design curve arcs and transitions for the corridor
+		 2. Combine arcs and transitions into a single event set, representing the curves
+		 3. Calculate tangets by subtracing curves from track events
+		 4. Split tangents into 1km long events
+		 5. Set curve or tangent attribute and combine curves and tangents into a single event set
+	  d. Create line segment and priovising centre segments:
+	     1. Merge line segment events with same line segment names
+		 2. Marge line segment events with same provising centre
+    ##################################################################################################
+    -->
+
+	<!-- Create 20m bins -->
+
+	est20mBin = event.CreateUniformLengthRangeEvents (strCorridor, , , , , uniMetre, , 20.0, uniMetre)
+
+	estTrackEnds = event.Subtract (estTracks, est20mBin)
+	est20mBin = event.Add (est20mBin, estTrackEnds)
+<!--    est20mBin = event.JoinShortEvents (est20mBin, 2.0, uniMetre, "Dominant") -->
+	est20mBin = event.Separate (est20mBin)
+
+	<!-- Create 50m bins -->
+
+	est50mBin = event.CreateUniformLengthRangeEvents (strCorridor, , , , , uniMetre, , 50.0, uniMetre)
+
+	estTrackEnds = event.Subtract (estTracks, est50mBin)
+	est50mBin = event.Add (est50mBin, estTrackEnds)
+<!--    est50mBin = event.JoinShortEvents (est50mBin, 5.0, uniMetre, "Dominant") -->
+	est50mBin = event.Separate (est50mBin)
+
+	<!-- Create curve and tangent segments -->
+
+	estArcs = event.LoadByCorridor (strArcCategory, strArcType, , , strCorridor)
+	estTransitions = event.LoadByCorridor (strTransitionCategory, strTransitionType, , , strCorridor)
+
+	estCurves = event.Add (estArcs, estTransitions)
+	estCurves = event.RemoveAllAttributes (estCurves)
+	estCurves = event.MergeWithinDistance (estCurves, 1.0, uniMetre)
+	estCurves = event.SetAttribute (estCurves, strNameAttrName, "Curve")
+
+	estTangents = event.Subtract (estTracks, estCurves)
+	estTangents = event.Separate (estTangents)
+	estTangents = event.Split (estTangents, 500.0, uniMetre, "EqualLengthSeparate")
+	<!-- estTangents = script.Call ("subF-SplitEvents", estTangents, 500.0, 600.0, uniMetre) -->
+	estTangents = event.SetAttribute (estTangents, strNameAttrName, "Tangent")
+
+	estCurvesAndTangents = event.Add (estCurves, estTangents)
+	estCurvesAndTangents = event.RetainAttribute (estCurvesAndTangents, strNameAttrName)
+
+	<!-- Create basecode segments -->
+
+	estBasecodes = event.RetainAttribute (estOriginalLineSegments, strBasecodeAttrName)
+	estBasecodes = event.MergeWithinDistance (estBasecodes, 1.0, uniMetre)
+	estBasecodes = event.CopyAttribute (estBasecodes, strBasecodeAttrName, strNameAttrName)
+	estBasecodes = event.RetainAttribute (estBasecodes, strNameAttrName)
+
+	<!-- Create line segment segments -->
+
+	estLineSegments = event.RetainAttribute (estOriginalLineSegments, strLineSegmentAttrName)
+	estLineSegments = event.MergeWithinDistance (estLineSegments, 1.0, uniMetre)
+	estLineSegments = event.CopyAttribute (estLineSegments, strLineSegmentAttrName, strNameAttrName)
+	estLineSegments = event.RetainAttribute (estLineSegments, strNameAttrName)
+
+	<!-- Create provisioning centre segments -->
+
+	estProvisioningCentres = event.RetainAttribute (estOriginalLineSegments, strProvisioningCentreAttrName)
+	estProvisioningCentres = event.MergeWithinDistance (estProvisioningCentres, 1.0, uniMetre)
+	estProvisioningCentres = event.CopyAttribute (estProvisioningCentres, strProvisioningCentreAttrName, strNameAttrName)
+	estProvisioningCentres = event.RetainAttribute (estProvisioningCentres, strNameAttrName)
+
+	<!-- Create pricing zone segments -->
+
+	estPricingZones = event.RetainAttribute (estOriginalLineSegments, strPricingZoneAttrName)
+	estPricingZones = event.MergeWithinDistance (estPricingZones, 1.0, uniMetre)
+	estPricingZones = event.CopyAttribute (estPricingZones, strPricingZoneAttrName, strNameAttrName)
+	estPricingZones = event.RetainAttribute (estPricingZones, strNameAttrName)
+
+    <!--
+    ##################################################################################################
+    Step 3 - Save data
+	  a. Delete any existing segments for the corridor
+	  b. Save the new segments
+    ##################################################################################################
+    -->
+
+	event.DeleteByCorridor (strSegmentCategory, , , strCorridor)
+
+	event.Save (est20mBin, strSegmentCategory, str20mBinType)
+	event.Save (est50mBin, strSegmentCategory, str50mBinType)
+	event.Save (estBasecodes, strSegmentCategory, strBasecodeType)
+	event.Save (estCurvesAndTangents, strSegmentCategory, strCurveAndTangentType)
+	event.Save (estLineSegments, strSegmentCategory, strLineSegmentType)
+	event.Save (estPricingZones, strSegmentCategory, strPricingZoneType)
+	event.Save (estProvisioningCentres, strSegmentCategory, strProvisioningCentreType)
+
+  </Commands>
+
+<Function logged = "false">
+  <Name>subF-SplitEvents</Name>
+
+  <Parameter required = "true">
+    <Name>estOriginal</Name>
+    <Type>eventSet</Type>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>dblLength</Name>
+    <Type>double</Type>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>dblMaxLength</Name>
+    <Type>double</Type>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>uniUnit</Name>
+    <Type>unit</Type>
+  </Parameter>
+
+  <Result>
+    <Name>estResult</Name>
+    <Type>eventSet</Type>
+  </Result>
+
+  <Commands>
+
+	<!-- Intitialise temporary attribute names -->
+
+	strTempLengthAttrName = string.Append ("TEMP Length")
+	strTempDilateStartByAttrName = string.Append ("TEMP Dilate Start By")
+	strTempDilateEndByAttrName = string.Append ("TEMP Dilate End By")
+	lisTempAttrNames = collection.ListCreate (strTempLengthAttrName, strTempDilateStartByAttrName, strTempDilateEndByAttrName)
+
+	<!-- Amount to dilate start by, to move event start by required length -->
+
+	forDilateStartBy = formula.Create ("0.0 - $dblLength")
+	dblDilateStartBy = formula.Evaluate (forDilateStartBy, , "double")
+
+	<!-- Formula to dilate end by, to move event end to required length -->
+
+	strForDilateEndBy = string.Append ("$dblLength - '", strTempLengthAttrName, "'")
+	forDilateEndBy = formula.Create (strForDilateEndBy)
+
+	<!-- Filters to select events greater than maximum length and those equal to or less than -->
+
+	filGTMaxLength = filter.CreateGreaterThanFilter (dblMaxLength)
+	atrFilLengthGTMaxLength = filter.CreateAttributeFilter (strTempLengthAttrName, filGTMaxLength)
+	evtFilLengthGTMaxLength = filter.CreateEventValueFilter (atrFilLengthGTMaxLength)
+
+	atrFilLengthLEMaxLength = filter.CreateNotFilter (atrFilLengthGTMaxLength)
+	evtFilLengthLEMaxLength = filter.CreateEventValueFilter (atrFilLengthLEMaxLength)
+
+	<!-- Initialise result event set and set temporary dilate start attribute to 0.0 -->
+
+	estResult = event.CreateEmptyEventSet ()
+	estOriginal = event.SetAttribute (estOriginal, strTempDilateStartByAttrName, 0.0)
+
+    <!-- Loop through events, splitting into equal length events and adding to return event set -->
+
+	BeginSegmentsLoop:
+
+		<!-- Separate events into those longer than max length and those shorter -->
+
+		estOriginal = event.SetAttributeToLength (estOriginal, strTempLengthAttrName, uniUnit)
+		estOriginalLEMaxLength = event.Filter (estOriginal, evtFilLengthLEMaxLength)
+		estOriginal = event.Filter (estOriginal, evtFilLengthGTMaxLength)
+
+		<!-- Create events of requierd length from start of events longer than maximum length -->
+
+		estOriginal = event.CalculateAttribute (estOriginal, forDilateEndBy, strTempDilateEndByAttrName, "double")
+		estOriginalEQRequiredLength = event.Dilate (estOriginal, strTempDilateStartByAttrName, strTempDilateEndByAttrName, uniUnit) 
+
+		<!-- Add events that were shorter than maximum length and the correct length to output results -->
+
+		estResult = event.Add (estResult, estOriginalLEMaxLength, estOriginalEQRequiredLength)
+
+        <!-- Shorten remaining events by moving start by required length -->
+
+		estOriginal = event.Dilate (estOriginal, dblDilateStartBy, 0.0, uniUnit)
+
+		<!-- Loop round if still events to process -->
+
+		lisEvents = event.GetEventList (estOriginal)
+		iNumEvents = collection.Size (lisEvents)
+		control.GoToIf ("$iNumEvents &gt; 0", "BeginSegmentsLoop")
+
+	<!-- Remove tempoary attributes from result set -->
+
+	estResult = event.RemoveAttributes (estResult, lisTempAttrNames)
+
+  </Commands>
+
+</Function>
+
+</Script>

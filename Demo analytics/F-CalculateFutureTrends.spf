@@ -1,0 +1,139 @@
+<?xml version = "1.0" encoding = "iso-8859-1" ?>
+
+<Function logged = "false">
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Description>
+    F-CalculateFutureTrends is a concrete implementation of event.CalculateFunctionValues command.
+    It calculates function values for given ordinate attributes and the corresponding lists
+    of pre-computed functions (see F- FitFunctionsOverTime). The calculations are performed
+    every number of months defined as intTrendMonthsFrequency and over time defined as intTrendMonths.
+    The number pre-computed functions mapped to each ordinate attribute must be the same as the number
+    of events in the supplied mask event set (one function per one mask event and the related
+    ordinate attribute).
+    Returns a set of events covering the same linear location as the give mask event.
+    Each event will have all ordinate attributes from the mapFitFunctions map holding
+    the calculated best fit function values. The start and end dates of each even are
+    calculated based on the current date and from the given intTrendMonthsFrequency.
+    For example, for 3 months frequency and 27 months duration.
+
+    *** Parameters ***
+    - estMask - A mask event to be used calculate output event set. It should be the same mask
+    which was used to calculate fit functions give as mapFitFunctions
+    - intTrendMonths - Number of months for which the trend events will be generated for,
+    for example a quality index trend may be calculated over 27 months.
+    - intTrendMonthsFrequency - Frequency of cellulations measured in moths, for example
+    a trend value can be calculated every 3 months.
+    - mapFitFunctions - A map of the numeric ordinate attribute names mapped
+    to the related computed best fit functions over time.
+
+  </Description>
+
+  <Parameter>
+    <Name>estMask</Name>
+    <Type>eventSet</Type>
+  </Parameter>
+
+  <Parameter>
+    <Name>intTrendMonths</Name>
+    <Type>integer</Type>
+  </Parameter>
+
+  <Parameter>
+    <Name>intTrendMonthsFrequency</Name>
+    <Type>integer</Type>
+  </Parameter>
+
+  <Parameter>
+    <Name>mapFitFunctions</Name>
+    <Type>map</Type>
+  </Parameter>
+
+  <Parameter>
+    <Name>lstAttributesToRetain</Name>
+    <Type>list</Type>
+  </Parameter>
+
+  <Result>
+    <Name>estResult</Name>
+    <Type>eventSet</Type>
+  </Result>
+
+  <Commands>
+    strTempStartDateAttrName = string.Append ("5b4c539b-773a-4586-bb9b-5089293240c8")
+    strTempEndDateAttrName  = string.Append ("5f46d1df-f00e-40cc-9803-3d560e19ba57")
+
+    estResult = event.CreateEmptyEventSet()
+    intTrendMonthIndex = util.Assign(intTrendMonthsFrequency)
+    forNextTrendMonthIndex = formula.Create("$intTrendMonthIndex + $intTrendMonthsFrequency")
+
+    forStartDate = formula.Create ("AddMonths (CurrentDate, $intTrendMonthIndex)" )
+    forEndDate = formula.Create ("AddMonths (CurrentDate, $intTrendMonthIndex + $intTrendMonthsFrequency)" )
+
+    loopBegin:
+    control.GoToIf("$intTrendMonthIndex > $intTrendMonths", "loopEnd")
+    estTrend = event.CalculateAttribute (estMask, forStartDate, strStartDateAttrName, "date")
+    estTrend = event.CalculateAttribute (estTrend, forEndDate, strEndDateAttrName, "date")
+    estTrend = script.Call("subF-CalculateFunctionValues", estTrend, mapFitFunctions, strStartDateAttrName)
+    estResult = event.Add (estTrend, estResult)
+    intTrendMonthIndex = formula.Evaluate(forNextTrendMonthIndex, , "integer")
+    control.GoTo("loopBegin")
+    loopEnd:
+
+    estResult = event.SetDatesToAttributes (estResult, strStartDateAttrName, strEndDateAttrName)
+    estResult = event.RemoveAttribute (estResult, strTempStartDateAttrName)
+    estResult = event.RemoveAttribute (estResult, strTempEndDateAttrName)
+  </Commands>
+
+
+  <Function logged = "false">
+    <Name>subF-CalculateFunctionValues</Name>
+    <Description>
+      Calculates function values for given event attributes.
+    </Description>
+
+    <Parameter>
+      <Name>estInputEvents</Name>
+      <Type>eventSet</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>mapFitFunctions</Name>
+      <Type>map</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strAbscissaAttribute</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Result>
+      <Name>estResult</Name>
+      <Type>eventSet</Type>
+    </Result>
+
+    <Commands>
+
+      lstAttributesToTrend = collection.MapKeys (mapFitFunctions)
+      intNumberAttributesToTrend = collection.Size(lstAttributesToTrend)
+      intIndex = util.Assign(0)
+      forNextIndex = formula.Create("$intIndex + 1")
+      estResult = util.Assign(estInputEvents)
+      loopBegin:
+      control.GoToIf("$intIndex == $intNumberAttributesToTrend", "loopEnd")
+      strOrdinateAttribute = collection.ListGet(lstAttributesToTrend, intIndex)
+      lstFitFunctions = collection.MapGet (mapFitFunctions, strOrdinateAttribute)
+      estResult = event.CalculateFunctionValues (estResult, lstFitFunctions, strAbscissaAttribute, strOrdinateAttribute)
+      strRoundFormula = string.Format ("round ('%s'*100.0)/100.0", strOrdinateAttribute)
+      forRoundValue = formula.Create (strRoundFormula)
+      estResult = event.CalculateAttribute (estResult, forRoundValue, strOrdinateAttribute, "double")
+
+      intIndex = formula.Evaluate(forNextIndex, , "integer")
+      control.GoTo("loopBegin")
+
+      loopEnd:
+
+    </Commands>
+  </Function>
+</Function>

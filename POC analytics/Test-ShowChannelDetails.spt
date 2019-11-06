@@ -1,0 +1,32 @@
+<?xml version = "1.0" encoding = "utf-8" ?>
+
+<Script>
+  <Description>Shows details of a channel</Description>
+  <Version>1.1</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter>
+    <Name>strSurvey</Name>
+    <Type>string</Type>
+    <Source>survey</Source>
+    <Alias>Survey</Alias>
+    <Default>IMP-ICW_34580_20190720</Default>
+  </Parameter>
+
+  <Parameter>
+    <Name>strChannel</Name>
+    <Type>string</Type>
+    <Source>channel</Source>
+    <Alias>Channel</Alias>
+    <Default>Twist 14m</Default>
+	<AssociatedParameter>strSurvey</AssociatedParameter>
+  </Parameter>
+
+  <Commands>
+
+    srmChannel = stream.Load (strSurvey, strChannel)
+	console.ShowValue ("Stream details", srmChannel)
+
+  </Commands>
+
+</Script>

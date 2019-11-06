@@ -1,0 +1,16 @@
+<?xml version = "1.0" encoding = "ISO-8859-1" ?>
+
+<Script>
+  <Description>Deletes a survey.</Description>
+
+  <Parameter>
+    <Name>strSurvey</Name>
+    <Type>string</Type>
+    <Source>survey</Source>
+    <Alias>Survey to delete: </Alias>
+  </Parameter>
+
+  <Commands>
+    survey.Delete (strSurvey)
+  </Commands>
+</Script>

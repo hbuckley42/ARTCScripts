@@ -1,0 +1,21 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Script>
+  <Description>Deletes an event category</Description>
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter>
+    <Name>strEventCategory</Name>
+    <Type>string</Type>
+    <Source>extentCategory</Source>
+    <Alias>Category Name:</Alias>
+  </Parameter>
+
+  <Commands>
+
+    event.DeleteCategory (strEventCategory)
+    cache.Refresh ("layer")
+
+  </Commands>
+</Script>

@@ -1,0 +1,21 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Script>
+  <Version>1.0</Version>
+  <Description>Deletes the selected survey</Description>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter required = "True">
+    <Name>strSurvey</Name>
+    <Type>string</Type>
+    <Source>survey</Source>
+    <Alias>Survey</Alias>
+  </Parameter>
+
+  <Commands>
+    bolSurveyExists = survey.Exists (strSurvey)
+    test.FailIfNotEqual (bolSurveyExists, true, "", "Survey does not exist.")
+    survey.Delete (strSurvey)
+  </Commands>
+
+</Script>

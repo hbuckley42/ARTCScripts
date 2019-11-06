@@ -1,0 +1,135 @@
+<?xml version = "1.0" encoding = "ISO-8859-1" ?>
+
+<Script>
+  <Description>
+    Normalizes the corrugation wavelengths.
+  </Description>
+
+  <Parameter>
+    <Name>strSurvey</Name>
+    <Type>string</Type>
+    <Source>survey</Source>
+    <Alias>Corrugation Survey: </Alias>
+    <Default>IMP-COR AK 20161104</Default>
+  </Parameter>
+
+  <Commands>
+
+    strMessage = string.Append ("This script can be only used to process raw corrugation AK surveys. \n")
+    strMessage = string.Append (strMessage, "The given file name does not match a raw corrugation AK file name format.\n")
+    strMessage = string.Append (strMessage, "TG file name format examples: IMP-COR.* ")
+
+    test.FailIfNotMatch (strSurvey, "^(IMP-COR).*", "", strMessage)
+
+    strRawSurvey = string.SubString (strSurvey, 5)
+    strImpSurvey = string.Append ("IMP-", strRawSurvey)
+    strNormSurveyName = string.Append ("NOR-", strRawSurvey)
+
+    strCorrSurveyType = string.Append("COR AK")
+    strNormSurveyType = string.Append("COR NORM")
+
+    strChannelTopLeft300  = string.Append("Top Left 300")
+    strChannelTopLeft500  = string.Append("Top Left 500")
+    strChannelTopLeft1000 = string.Append("Top Left 1000")
+    strChannelTopLeft2000 = string.Append("Top Left 2000")
+    strChannelTopLeft3000 = string.Append("Top Left 3000")
+
+    strChannelTopRight300  = string.Append("Top Right 300")
+    strChannelTopRight500  = string.Append("Top Right 500")
+    strChannelTopRight1000 = string.Append("Top Right 1000")
+    strChannelTopRight2000 = string.Append("Top Right 2000")
+    strChannelTopRight3000 = string.Append("Top Right 3000")
+
+    strChannelRMSTopLeft300  = string.Append("RMS Top Left 300")
+    strChannelRMSTopLeft500  = string.Append("RMS Top Left 500")
+    strChannelRMSTopLeft1000 = string.Append("RMS Top Left 1000")
+    strChannelRMSTopLeft2000 = string.Append("RMS Top Left 2000")
+    strChannelRMSTopLeft3000 = string.Append("RMS Top Left 3000")
+
+    strChannelRMSTopRight300  = string.Append("RMS Top Right 300")
+    strChannelRMSTopRight500  = string.Append("RMS Top Right 500")
+    strChannelRMSTopRight1000 = string.Append("RMS Top Right 1000")
+    strChannelRMSTopRight2000 = string.Append("RMS Top Right 2000")
+    strChannelRMSTopRight3000 = string.Append("RMS Top Right 3000")
+
+
+    srmTopLeft300  = stream.Load (strSurvey, strChannelTopLeft300 , strCorrSurveyType)
+    srmTopLeft500  = stream.Load (strSurvey, strChannelTopLeft500 , strCorrSurveyType)
+    srmTopLeft1000 = stream.Load (strSurvey, strChannelTopLeft1000, strCorrSurveyType)
+    srmTopLeft2000 = stream.Load (strSurvey, strChannelTopLeft2000, strCorrSurveyType)
+    srmTopLeft3000 = stream.Load (strSurvey, strChannelTopLeft3000, strCorrSurveyType)
+
+    srmTopRight300  = stream.Load (strSurvey, strChannelTopRight300 , strCorrSurveyType)
+    srmTopRight500  = stream.Load (strSurvey, strChannelTopRight500 , strCorrSurveyType)
+    srmTopRight1000 = stream.Load (strSurvey, strChannelTopRight1000, strCorrSurveyType)
+    srmTopRight2000 = stream.Load (strSurvey, strChannelTopRight2000, strCorrSurveyType)
+    srmTopRight3000 = stream.Load (strSurvey, strChannelTopRight3000, strCorrSurveyType)
+
+    srmTopRMSLeft300  = stream.Load (strSurvey, strChannelRMSTopLeft300 , strCorrSurveyType)
+    srmTopRMSLeft500  = stream.Load (strSurvey, strChannelRMSTopLeft500 , strCorrSurveyType)
+    srmTopRMSLeft1000 = stream.Load (strSurvey, strChannelRMSTopLeft1000, strCorrSurveyType)
+    srmTopRMSLeft2000 = stream.Load (strSurvey, strChannelRMSTopLeft2000, strCorrSurveyType)
+    srmTopRMSLeft3000 = stream.Load (strSurvey, strChannelRMSTopLeft3000, strCorrSurveyType)
+
+    srmTopRMSRight300  = stream.Load (strSurvey, strChannelRMSTopRight300 , strCorrSurveyType)
+    srmTopRMSRight500  = stream.Load (strSurvey, strChannelRMSTopRight500 , strCorrSurveyType)
+    srmTopRMSRight1000 = stream.Load (strSurvey, strChannelRMSTopRight1000, strCorrSurveyType)
+    srmTopRMSRight2000 = stream.Load (strSurvey, strChannelRMSTopRight2000, strCorrSurveyType)
+    srmTopRMSRight3000 = stream.Load (strSurvey, strChannelRMSTopRight3000, strCorrSurveyType)
+
+    srmTopLeft300  = stream.Math (srmTopLeft300 , "/", 300 )
+    srmTopLeft500  = stream.Math (srmTopLeft500 , "/", 500 )
+    srmTopLeft1000 = stream.Math (srmTopLeft1000, "/", 1000)
+    srmTopLeft2000 = stream.Math (srmTopLeft2000, "/", 2000)
+    srmTopLeft3000 = stream.Math (srmTopLeft3000, "/", 3000)
+
+    srmTopRight300  = stream.Math (srmTopRight300 , "/", 300 )
+    srmTopRight500  = stream.Math (srmTopRight500 , "/", 500 )
+    srmTopRight1000 = stream.Math (srmTopRight1000, "/", 1000)
+    srmTopRight2000 = stream.Math (srmTopRight2000, "/", 2000)
+    srmTopRight3000 = stream.Math (srmTopRight3000, "/", 3000)
+
+    srmTopRMSLeft300  = stream.Math (srmTopRMSLeft300 , "/", 300 )
+    srmTopRMSLeft500  = stream.Math (srmTopRMSLeft500 , "/", 500 )
+    srmTopRMSLeft1000 = stream.Math (srmTopRMSLeft1000, "/", 1000)
+    srmTopRMSLeft2000 = stream.Math (srmTopRMSLeft2000, "/", 2000)
+    srmTopRMSLeft3000 = stream.Math (srmTopRMSLeft3000, "/", 3000)
+
+    srmTopRMSRight300  = stream.Math (srmTopRMSRight300 , "/", 300 )
+    srmTopRMSRight500  = stream.Math (srmTopRMSRight500 , "/", 500 )
+    srmTopRMSRight1000 = stream.Math (srmTopRMSRight1000, "/", 1000)
+    srmTopRMSRight2000 = stream.Math (srmTopRMSRight2000, "/", 2000)
+    srmTopRMSRight3000 = stream.Math (srmTopRMSRight3000, "/", 3000)
+
+    mapStreams = collection.MapCreate ()
+    collection.MapPut (mapStreams, strChannelTopLeft300  , srmTopLeft300  )
+    collection.MapPut (mapStreams, strChannelTopLeft500  , srmTopLeft500  )
+    collection.MapPut (mapStreams, strChannelTopLeft1000 , srmTopLeft1000 )
+    collection.MapPut (mapStreams, strChannelTopLeft2000 , srmTopLeft2000 )
+    collection.MapPut (mapStreams, strChannelTopLeft3000 , srmTopLeft3000 )
+
+    collection.MapPut (mapStreams, strChannelTopRight300 , srmTopRight300 )
+    collection.MapPut (mapStreams, strChannelTopRight500 , srmTopRight500 )
+    collection.MapPut (mapStreams, strChannelTopRight1000, srmTopRight1000)
+    collection.MapPut (mapStreams, strChannelTopRight2000, srmTopRight2000)
+    collection.MapPut (mapStreams, strChannelTopRight3000, srmTopRight3000)
+
+    collection.MapPut (mapStreams, strChannelRMSTopLeft300  , srmTopRMSLeft300  )
+    collection.MapPut (mapStreams, strChannelRMSTopLeft500  , srmTopRMSLeft500  )
+    collection.MapPut (mapStreams, strChannelRMSTopLeft1000 , srmTopRMSLeft1000 )
+    collection.MapPut (mapStreams, strChannelRMSTopLeft2000 , srmTopRMSLeft2000 )
+    collection.MapPut (mapStreams, strChannelRMSTopLeft3000 , srmTopRMSLeft3000 )
+
+    collection.MapPut (mapStreams, strChannelRMSTopRight300 , srmTopRMSRight300 )
+    collection.MapPut (mapStreams, strChannelRMSTopRight500 , srmTopRMSRight500 )
+    collection.MapPut (mapStreams, strChannelRMSTopRight1000, srmTopRMSRight1000)
+    collection.MapPut (mapStreams, strChannelRMSTopRight2000, srmTopRMSRight2000)
+    collection.MapPut (mapStreams, strChannelRMSTopRight3000, srmTopRMSRight3000)
+
+    datSurveyDate = survey.GetDate (strSurvey)
+
+    survey.Delete (strNormSurveyName)
+    survey.Save (strNormSurveyName, datSurveyDate, strNormSurveyType, mapStreams)
+
+  </Commands>
+</Script>

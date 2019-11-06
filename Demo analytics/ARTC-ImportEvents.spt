@@ -1,0 +1,109 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Script>
+  <Version>2.4</Version>
+  <Description>This script imports events into the database.</Description>
+
+  <Parameter>
+    <Name>strUsername</Name>
+    <Type>string</Type>
+    <Source>user</Source>
+    <Default></Default>
+    <Alias>User File Owner</Alias>
+  </Parameter>
+
+  <Parameter>
+    <Name>strDataFile</Name>
+    <Type>string</Type>
+    <Alias>File Name:</Alias>
+    <Source>userFile</Source>
+    <Default></Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+  </Parameter>
+
+  <Parameter>
+    <Name>strSuccessFolderName</Name>
+    <Type>string</Type>
+    <Alias>Success Folder Name:</Alias>
+    <Source>userFolder</Source>
+    <Default></Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+  </Parameter>
+
+  <Parameter>
+    <Name>strFailedFolderName</Name>
+    <Type>string</Type>
+    <Alias>Failed Folder Name:</Alias>
+    <Source>userFolder</Source>
+    <Default></Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+  </Parameter>
+
+  <Commands>
+
+    console.ShowValue("$Copyright: (c) 2018 Bentley Systems, Incorporated. All rights reserved.","")
+
+    <!-- We temporarily want to display warnings for the duration of this script -->
+    script.SetLogLevel ("warn")
+
+    intIndexOfStar = string.IndexOf (strDataFile, "*")
+    test.ExitIfNotEqual (intIndexOfStar, -1, "", "There are no event files to process.")
+    estDLDName = script.Call("subF-GetDLD", strDataFile)
+    uflImportFile = userfile.GetUserFile (strUsername, strDataFile)
+    intNumImported = event.ImportFile (uflImportFile, , estDLDName)
+
+    <!-- Reset to the default logging level -->
+    script.SetLogLevel ("error")
+
+  </Commands>
+
+
+  <Function logged = "false">
+    <Name>subF-GetDLD</Name>
+    <Description></Description>
+
+    <Parameter>
+      <Name>strDataFile</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Result>
+      <Name>estDLDName</Name>
+      <Type>string</Type>
+    </Result>
+
+    <Commands>
+      mapFileToDLD = collection.MapCreate()
+      collection.MapPut(mapFileToDLD, "B-Sample_Data-Equipment Track Location-Trackcode_Basecode.csv", "ARTC-Asset-Equipment Track Location.dld")
+
+      collection.MapPut(mapFileToDLD, "B-Curve Component Events from Curvature file.csv", "ARTC-Event-Curve Component.dld")
+      collection.MapPut(mapFileToDLD, "B-Sample_Data-Work Records-Grinding-Basecode 10003-300 to 310km.csv", "ARTC-Event-Grinding Work.dld")
+      collection.MapPut(mapFileToDLD, "B-Sample_Data-Work Records-Turnout-Basecode 10003-300 to 310km.csv", "ARTC-Event-Turnout Work.dld")
+      collection.MapPut(mapFileToDLD, "B-Sample_Data-Work Records-Worx-Basecode 10003-300 to 310km.csv", "ARTC-Event Worx Work.dld")
+      collection.MapPut(mapFileToDLD, "Sample_Data-Climate-[Report].[ClimateByNearestWeatherStation]-basecode 10003-300to310km.csv", "ARTC-Event-Climate.dld")
+
+      collection.MapPut(mapFileToDLD, "Sample_Data-Known Conditions-Ellipse-Basecode10003-300to310km.csv", "ARTC-Event-Ellipse Known Conditions.dld")
+      collection.MapPut(mapFileToDLD, "Sample_Data-Misalignment_Records - Basecode 10003 - 300 to 310km.csv", "ARTC-Event-Misalignment.dld")
+      collection.MapPut(mapFileToDLD, "Sample_Data-Rail Break_Records - Basecode 10003 - 300 to 310km.csv", "ARTC-Event-Rail Break.dld")
+      collection.MapPut(mapFileToDLD, "Sample_Data-Rail Safety Incident - Basecode 10003 - 300to310km.csv", "ARTC-Event-Rail Safety Incident.dld")
+      collection.MapPut(mapFileToDLD, "Sample_Data-Speed_Restriction - Basecode 10003 - 300 to 310km.csv", "ARTC-Event-Speed Restriction.dld")
+      collection.MapPut(mapFileToDLD, "Sample_Data-TrackObservation-AKCar Geometry-Basecode 10003-300to310km(Exceedances).csv", "ARTC-Event-Exceedances AK Car.dld")
+      collection.MapPut(mapFileToDLD, "Sample_Data-TrackObservation-ICW-Basecode 10003-300to310km(Exceedances).csv", "ARTC-Event-Exceedances ICW.dld")
+      collection.MapPut(mapFileToDLD, "Sample_Data-TrackObservation-SPENO-Basecode 10003-300to310km(Exceedances).csv", "ARTC-Event-Exceedances SPENO.dld")
+
+      collection.MapPut(mapFileToDLD, "Sample_Data-Work Records-WorkOrder Ellipse-Basecode 10003-300 to 310km.csv", "ARTC-Event-Ellipse Work Order.dld")
+      collection.MapPut(mapFileToDLD, "Sample_Data_Planned work - current database - Basecode 10003 - 300to310km.csv", "ARTC-Event-Planned Work.dld")
+      <!-- collection.MapPut(mapFileToDLD, ""B-Addedum #05 - Sample_Data-Operations-TCR and delay- Basecode 100.csv", "ARTC-Event-TCR Incident.dld")-->
+
+      collection.MapPut(mapFileToDLD, "Sample_Data-Track Bed Condition  - Basecode 10003 - 300 to 310km.csv", "ARTC-Event-Track Bed Condition.dld")
+      collection.MapPut(mapFileToDLD, "GPR-R26016-2012-07-27.csv", "ARTC-Event-Track Bed Condition.dld")
+      collection.MapPut(mapFileToDLD, "GPR-R26017-2016-04-20.csv", "ARTC-Event-Track Bed Condition.dld")
+      collection.MapPut(mapFileToDLD, "GPR-R26018-2016-04-21.csv", "ARTC-Event-Track Bed Condition.dld")
+      collection.MapPut(mapFileToDLD, "GPR-R28783-2018-07-04.csv", "ARTC-Event-Track Bed Condition.dld")
+
+      strEventFilename = string.ReplaceRegex (strDataFile, "^.*(\\\\|/)", "")
+      estDLDName = collection.MapGet (mapFileToDLD, strEventFilename)
+
+    </Commands>
+  </Function>
+</Script>

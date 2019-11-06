@@ -1,0 +1,648 @@
+<?xml version = "1.0" encoding = "utf-8" ?>
+
+<Script>
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+  <Description>
+    Calculates Track Condition compound index
+  </Description>
+
+  <Parameter>
+    <Name>strSurvey</Name>
+    <Type>string</Type>
+    <Source>survey</Source>
+    <Alias>Survey:</Alias>
+    <Default>IMP-AK Track Geometry.*</Default>
+  </Parameter>
+
+  <Parameter>
+    <Name>strSegmentType</Name>
+    <Type>string</Type>
+    <Alias>Segment:</Alias>
+    <Source>choice</Source>
+    <Choice>Compound</Choice>
+    <Choice>100 metre</Choice>
+    <Choice>200 metre</Choice>
+    <Default>Compound</Default>
+  </Parameter>
+
+  <Commands>
+
+    <!--
+    ##################################################################################################
+    Input 
+      Compound Segments 
+      AK Track Geometry channels 
+          Surface L/R 20 
+          Align L/R 20
+        GPR
+          BFI
+          LRI
+    Output
+      Extent Category: Track Condition    
+      Extent Type: Track Condition    
+          Location: Basecode
+                    TODO: Basecode description,
+                    Start and finish km of segments
+          Attributes:
+                    Ellipse equipment number
+                    Curve radius
+                    Average TMS for the segment
+                    Maximum TMS for the segment
+                    PC Change in TMS over the past 12 months
+                    Average 6mMS for the segment
+                    Max 6mMS for the segment
+                    Average LMS for the segment
+                    Max LMS for the segment
+                    Open Geometry Defects
+                    Maximum ICW (SND) in the past month
+                    Average ICW (SND) in the past month
+                    Minimum Ballast fouling Index (Excluding 0)
+                    Minimum Layer Roughness Index (Excluding 0)
+    ##################################################################################################    -->
+
+    test.FailIfNullOrEmpty (strSegmentType, "", "Please select a segment type")
+
+    strSegmentCategoryName = util.Assign ("Segment")
+
+    <!-- GPR Channels -->
+    strTBCCategory = util.Assign ("Track Bed Condition")
+    strTBCType = util.Assign ("Track Bed Condition")
+    strAttrBFICategory = util.Assign ("Ballast Fouling Index Category Centre")
+    strAttrLRICategory = util.Assign ("Layer Roughness Index Category Centre")
+
+    <!-- Input TG Survey -->
+    strAttrTrackTestRunID = util.Assign ("Track Test Run ID")
+    strRawSurvey = string.SubString (strSurvey, 5)
+    strMovingSumsSurvey = string.Append ("TMS-", strRawSurvey)
+
+    strChannelNameSurfaceLeft20m = util.Assign ("Surface Left 20m")
+    strChannelNameSurfaceRight20m = util.Assign ("Surface Right 20m")
+
+    strMSSurveyType = util.Assign ("TG Moving Sums")
+    strChannelNameTMSMean = util.Assign ("TMS Mean")
+    strChannelNameTMSLeft = util.Assign ("TMS Left")
+    strChannelNameTMSRight = util.Assign ("TMS Right")
+    strChannelNameTopLeft = util.Assign ("Top Left")
+    strChannelNameTopRight = util.Assign ("Top Right")
+    strChannelName6mMSLeft = util.Assign ("6mMS Left")
+    strChannelName6mMSRight = util.Assign ("6mMS Right")
+    strChannelNameLMSLeft = util.Assign ("LMS Left")
+    strChannelNameLMSRight = util.Assign ("LMS Right")
+
+    strChannelNameAlignLeft20m = util.Assign ("Align Lelft 20m") <!-- TODO: Spelling-->
+    strChannelNameAlignRight20m = util.Assign ("Align Right 20m")
+
+    <!-- Output event set -->
+    strTrackConditionCategory = string.Append ("Track Condition")
+    strTrackConditionType = string.Append ("Track Condition")
+
+    lstOutAttributes = collection.ListCreate ()
+    strSurveyNameAttrName = script.Call("subF-GetAttribute", lstOutAttributes, "Survey Name")
+    strSurveyDateAttrName = script.Call("subF-GetAttribute", lstOutAttributes, "Survey Date")
+    strAttrSegment = script.Call("subF-GetAttribute", lstOutAttributes, "Segment")
+    strAttrSegmentID = script.Call("subF-GetAttribute", lstOutAttributes, "Segment ID")
+    strAttrCurveID = script.Call("subF-GetAttribute", lstOutAttributes, "Curve ID")
+    strAttrRadius = script.Call("subF-GetAttribute", lstOutAttributes, "Radius")
+    strAttrVersine = script.Call("subF-GetAttribute", lstOutAttributes, "Versine")
+    strAttrCurveSide = script.Call("subF-GetAttribute", lstOutAttributes, "Curve Side")
+
+    strAttrTMSAverage = script.Call("subF-GetAttribute", lstOutAttributes, "TMS Average")
+    strAttrLMSAverage = script.Call("subF-GetAttribute", lstOutAttributes, "LMS Average")
+    strAttr6mMSAverage = script.Call("subF-GetAttribute", lstOutAttributes, "6mMS Average")
+    strAttrTMSMaximum = script.Call("subF-GetAttribute", lstOutAttributes, "TMS Maximum")
+    strAttrLMSMaximum = script.Call("subF-GetAttribute", lstOutAttributes, "LMS Maximum")
+    strAttr6mMSMaximum = script.Call("subF-GetAttribute", lstOutAttributes, "6mMS Maximum")
+    strAttrTMSChange  = script.Call("subF-GetAttribute", lstOutAttributes, "TMS % Change (12 months)")
+    strAttrMinimumBFI = script.Call("subF-GetAttribute", lstOutAttributes, "Minimum Ballast Fouling Index")
+    strAttrMinimumLRI = script.Call("subF-GetAttribute", lstOutAttributes, "Minimum Layer Roughness Index")
+    strAttrTGDefectsCount = script.Call("subF-GetAttribute", lstOutAttributes, "Number of Open Geometry Defects")
+    strAttrSNDMaximum = script.Call("subF-GetAttribute", lstOutAttributes, "SND Maximum")
+
+    strAttrTBCTrackTestRunID = script.Call("subF-GetAttribute", lstOutAttributes, "GPR Test Run ID")
+    strAttrTGTrackTestRunID = script.Call("subF-GetAttribute", lstOutAttributes, "TG Test Run ID")
+    strAttrGPRRunNumber = script.Call("subF-GetAttribute", lstOutAttributes, "GPR Run Number")
+    strAttrTrackConditionRank = script.Call("subF-GetAttribute", lstOutAttributes, "Track Condition Rank")
+
+    lstScoreAttributes = collection.ListCreate ()
+    strAttrTMSAverageScore = script.Call("subF-GetAttribute", lstScoreAttributes, "TMS Average Score")
+    strAttrLMSAverageScore = script.Call("subF-GetAttribute", lstScoreAttributes, "LMS Average Score")
+    strAttr6mMSAverageScore = script.Call("subF-GetAttribute", lstScoreAttributes, "6mMS Average Score")
+    strAttrTMSMaximumScore = script.Call("subF-GetAttribute", lstScoreAttributes, "TMS Maximum Score")
+    strAttrLMSMaximumScore = script.Call("subF-GetAttribute", lstScoreAttributes, "LMS Maximum Score")
+    strAttr6mMSMaximumScore = script.Call("subF-GetAttribute", lstScoreAttributes, "6mMS Maximum Score")
+    strAttrTMSChangeScore = script.Call("subF-GetAttribute", lstScoreAttributes, "TMS % Change (12 months) Score")
+    strAttrMinimumBFIScore = script.Call("subF-GetAttribute", lstScoreAttributes, "Minimum BFI Score")
+    strAttrMinimumLRIScore = script.Call("subF-GetAttribute", lstScoreAttributes, "Minimum LRI Score")
+    strAttrTGDefectsScore = script.Call("subF-GetAttribute", lstScoreAttributes, "Geometry Defects Score")
+    strAttrSNDMaximumScore = script.Call("subF-GetAttribute", lstScoreAttributes, "SND Maximum Score")
+
+    collection.ListAddAll (lstOutAttributes, lstScoreAttributes)
+
+    <!--
+    ##################################################################################################
+      Units Definition
+    ################################################################################################## -->
+    uniMetre = unit.GetUnit ("Metric", "metre")
+
+    <!--
+    ##################################################################################################
+      Global Formulas Definition
+    ################################################################################################## -->
+    strAdd2WeeksFormula = string.Append ("AddDays ('", strSurveyDateAttrName, "', 14)")
+    forAdd2Weeks = formula.Create (strAdd2WeeksFormula)
+
+    strAddMonthFormula = string.Append ("AddMonths ('", strSurveyDateAttrName, "', 1)")
+    forAddOneMonth = formula.Create (strAddMonthFormula)
+
+    <!--
+    ###################################################################################################################
+      Processing Step 1 - Load  Data
+    ###################################################################################################################-->
+    datSurvey = survey.GetDate (strSurvey)
+    srmSurfaceLeft20m= stream.Load (strSurvey, strChannelNameSurfaceLeft20m)
+    srmSurfaceRight20m= stream.Load (strSurvey, strChannelNameSurfaceRight20m)
+    srmAlignLeft20m = stream.Load (strSurvey, strChannelNameAlignLeft20m)
+    srmAlignRight20m= stream.Load (strSurvey, strChannelNameAlignRight20m)
+
+    trvSurvey = stream.ToTraversals (srmSurfaceLeft20m)
+    estMaskForCalc = event.LoadByTraversal (strSegmentCategoryName, strSegmentType, , , trvSurvey)
+
+    <!--
+    ###################################################################################################################
+      Processing Step 2 - Calculate Moving Sums streams
+    ###################################################################################################################-->
+    datSurvey = survey.GetDate (strSurvey)
+    srmTMSLeft = stream.Absolute (srmSurfaceLeft20m)
+    srmTMSLeft = stream.ComputeSwept (srmTMSLeft, "Sum", 0.8, 60)
+    srmTMSRight = stream.Absolute (srmSurfaceRight20m)
+    srmTMSRight = stream.ComputeSwept (srmTMSRight, "Sum", 0.8, 60)
+
+    srm6mMSLeft = stream.Absolute (srmSurfaceLeft20m)
+    srm6mMSLeft = stream.ComputeSwept (srm6mMSLeft, "Sum", 0.8, 6)
+    srm6mMSRight = stream.Absolute (srmSurfaceRight20m)
+    srm6mMSRight = stream.ComputeSwept (srm6mMSRight, "Sum", 0.8, 6)
+
+    srmLMSLeft = stream.Absolute (srmAlignLeft20m)
+    srmLMSLeft = stream.ComputeSwept (srmLMSLeft, "Sum", 0.8, 60)
+    srmLMSRight = stream.Absolute (srmAlignRight20m)
+    srmLMSRight = stream.ComputeSwept (srmLMSRight, "Sum", 0.8, 60)
+
+    srmTMSAverage = stream.Math (srmTMSLeft, "+", srmTMSRight)
+    srmTMSAverage = stream.Math (srmTMSAverage, "*", 0.5)
+
+    srm6mMSAverage = stream.Math (srm6mMSLeft, "+", srm6mMSRight)
+    srm6mMSAverage = stream.Math (srm6mMSAverage, "*", 0.5)
+
+    srmLMSAverage = stream.Math (srmLMSLeft, "+", srmLMSRight)
+    srmLMSAverage = stream.Math (srmLMSAverage, "*", 0.5)
+
+    mapMSSurvey = collection.MapCreate()
+    collection.MapPut (mapMSSurvey, strChannelName6mMSLeft, srm6mMSLeft)
+    collection.MapPut (mapMSSurvey, strChannelName6mMSRight, srm6mMSRight)
+    collection.MapPut (mapMSSurvey, strChannelNameLMSLeft, srmLMSLeft)
+    collection.MapPut (mapMSSurvey, strChannelNameLMSRight, srmLMSRight)
+    collection.MapPut (mapMSSurvey, strChannelNameTMSLeft, srmTMSLeft)
+    collection.MapPut (mapMSSurvey, strChannelNameTMSRight, srmTMSLeft)
+    collection.MapPut (mapMSSurvey, strChannelNameTMSMean, srmTMSAverage)
+
+    <!--
+    ###################################################################################################################
+      Processing Step 3 - Calculate Average TMS, 6mMS, LMS
+    ###################################################################################################################-->
+
+    estTrackCondition = stream.ComputeMeanOnEvents (srmTMSAverage, estMaskForCalc, strAttrTMSAverage)
+    estTrackCondition = stream.ComputeMeanOnEvents (srmLMSAverage, estTrackCondition, strAttrLMSAverage)
+    estTrackCondition = stream.ComputeMeanOnEvents (srm6mMSAverage, estTrackCondition, strAttr6mMSAverage)
+
+    estTrackCondition = script.Call("subF-RoundAttributeValue", estTrackCondition, strAttrTMSAverage)
+    estTrackCondition = script.Call("subF-RoundAttributeValue", estTrackCondition, strAttrLMSAverage)
+    estTrackCondition = script.Call("subF-RoundAttributeValue", estTrackCondition, strAttr6mMSAverage)
+
+    estTrackCondition = script.Call("subF-CalculateScoreRange", estTrackCondition, strAttrTMSAverage, strAttrTMSAverageScore, 0, 2, 4, 6, 200, 300, 500)
+    estTrackCondition = script.Call("subF-CalculateScoreRange", estTrackCondition, strAttrLMSAverage, strAttrLMSAverageScore, 0, 1, 2, 3, 200, 300, 500)
+    estTrackCondition = script.Call("subF-CalculateScoreRange", estTrackCondition, strAttr6mMSAverage, strAttr6mMSAverageScore, 0, 1, 2, 3, 200, 300, 500)
+
+    <!--
+    ###################################################################################################################
+      Processing Step 4 - Calculate Average TMS, 6mMS, LMS
+    ###################################################################################################################-->
+
+    estTrackCondition = stream.ComputeMaximumOnEvents (srmTMSAverage, estTrackCondition, strAttrTMSMaximum)
+    estTrackCondition = stream.ComputeMaximumOnEvents (srmLMSAverage, estTrackCondition, strAttrLMSMaximum)
+    estTrackCondition = stream.ComputeMaximumOnEvents (srm6mMSAverage, estTrackCondition, strAttr6mMSMaximum)
+    estTrackCondition = script.Call("subF-RoundAttributeValue", estTrackCondition, strAttrTMSMaximum)
+    estTrackCondition = script.Call("subF-RoundAttributeValue", estTrackCondition, strAttrLMSMaximum)
+    estTrackCondition = script.Call("subF-RoundAttributeValue", estTrackCondition, strAttr6mMSMaximum)
+
+    estTrackCondition = script.Call("subF-CalculateScoreRange", estTrackCondition, strAttrTMSMaximum, strAttrTMSMaximumScore, 0, 2, 4, 6, 300, 500, 700)
+    estTrackCondition = script.Call("subF-CalculateScoreRange", estTrackCondition, strAttrLMSMaximum, strAttrLMSMaximumScore, 0, 2, 4, 6, 300, 500, 700)
+    estTrackCondition = script.Call("subF-CalculateScoreRange", estTrackCondition, strAttr6mMSMaximum, strAttr6mMSMaximumScore, 0, 2, 4, 6, 300, 500, 700)
+
+    <!--
+    ###################################################################################################################
+      Processing Step 5 - % Change in TMS over the past 12 months
+    ###################################################################################################################-->
+    lstTMSChannels = collection.ListCreate (strChannelNameTMSMean)
+    lstTMSChannelTypes = collection.ListCreate (strMSSurveyType)
+
+    forSurveyDateMinus12Months = formula.Create ("AddYears ($datSurvey, -1)")
+    datSurveyMinus12Months = formula.Evaluate (forSurveyDateMinus12Months, ,"date")
+
+    mapAggregatedStreams = stream.LoadAggregatedByDate (lstTMSChannels, lstTMSChannelTypes, estTrackCondition, datSurveyMinus12Months, "ClosestSurveyToDate")
+    srmYearOldTMSMean = collection.MapGet (mapAggregatedStreams, strChannelNameTMSMean)
+    estTrackCondition = stream.ComputeMeanOnEvents (srmYearOldTMSMean, estTrackCondition, strAttrTMSChange)
+
+    strTMSChangePct = string.Format ("round((('%s'-'%s')/'%s')*10000)/100", strAttrTMSAverage, strAttrTMSChange, strAttrTMSChange)
+    forTMSChangePct = formula.Create(strTMSChangePct)
+    estTrackCondition = event.CalculateAttribute (estTrackCondition, forTMSChangePct, strAttrTMSChange, "double")
+    estTrackCondition = script.Call("subF-CalculateScoreRange", estTrackCondition, strAttrTMSChange, strAttrTMSChangeScore, 0, 3, 6, 9, 10, 30, 50)
+    <!--
+    ###################################################################################################################
+      Processing Step 6 - Track Bed Condition - Ballast Fouling Index Category Centre
+    ###################################################################################################################-->
+
+    estTBC = event.LoadByTraversal (strTBCCategory, strTBCType, , , trvSurvey)
+
+    filGT0 = filter.CreateGreaterThanFilter (0.0)
+    atrFilterBFICategoryGT0 = filter.CreateAttributeFilter (strAttrBFICategory, filGT0)
+    evtFilterBFICategoryGT0 = filter.CreateEventValueFilter (atrFilterBFICategoryGT0)
+    estBFIGreaterThanZero = event.Filter (estTBC, evtFilterBFICategoryGT0)
+
+    atrFilterLRICategoryGT0 = filter.CreateAttributeFilter (strAttrLRICategory, filGT0)
+    evtFilterLRICategoryGT0 = filter.CreateEventValueFilter (atrFilterLRICategoryGT0)
+    estLRIGreaterThanZero = event.Filter (estTBC, evtFilterLRICategoryGT0)
+
+    estTrackCondition = event.Aggregate (estTrackCondition, estBFIGreaterThanZero, strAttrBFICategory, strAttrMinimumBFI, "Minimum")
+    estTrackCondition = event.Aggregate (estTrackCondition, estLRIGreaterThanZero, strAttrLRICategory, strAttrMinimumLRI, "Minimum")
+    estTrackCondition = event.Aggregate (estTrackCondition, estTBC, strAttrTrackTestRunID, strAttrTBCTrackTestRunID, "Dominant")
+    estTrackCondition = event.Aggregate (estTrackCondition, estTBC, strAttrGPRRunNumber, strAttrGPRRunNumber, "Dominant")
+
+    estTrackCondition = script.Call("subF-CalculateScoreEqual", estTrackCondition, strAttrMinimumBFI, strAttrMinimumBFIScore, 0, 2, 4, 6, 4, 3, 2, 1)
+    estTrackCondition = script.Call("subF-CalculateScoreEqual", estTrackCondition, strAttrMinimumLRI, strAttrMinimumLRIScore, 0, 0, 4, 6, 4, 3, 2, 1)
+
+    <!-- TODO: hardcoded -->
+    estTrackCondition = event.SetAttribute (estTrackCondition, strAttrTBCTrackTestRunID, "28783")
+    estTrackCondition = event.SetAttribute (estTrackCondition, strAttrGPRRunNumber, 10)
+
+    <!--
+    ###################################################################################################################
+      Processing Step 8 - Open Geometry Defects 
+      TODO: I do not know which data type contains information we need to Aggregate henc hardcoded for the demo  
+    ###################################################################################################################-->
+
+    estTrackCondition = event.SetAttribute (estTrackCondition, strAttrTGDefectsCount, 0)
+    estTrackCondition = event.SetAttribute (estTrackCondition, strAttrTGDefectsScore, 0)
+
+    <!--
+    ###################################################################################################################
+      Processing Step 9 - Maximum ICW (SND) in the past month Spring Nest Deflection
+      TODO: Hardcoded 
+    ###################################################################################################################-->
+    estTrackCondition = event.SetAttribute (estTrackCondition, strAttrSNDMaximum, 0)
+    estTrackCondition = event.SetAttribute (estTrackCondition, strAttrSNDMaximumScore, 0)
+
+    <!--
+    ###################################################################################################################
+      Processing Step 9 - The segment will be ranked by summing up the score for each measure in the segment.
+    ###################################################################################################################-->
+    forSumScoresFormula = script.Call("subF-GetAttributeSumFormula", lstScoreAttributes)
+    estTrackCondition = event.CalculateAttribute (estTrackCondition, forSumScoresFormula, strAttrTrackConditionRank, "integer")
+
+    <!--
+    ###################################################################################################################
+      Processing Step 11  
+      Set the end date to Survey Date + 1 month
+    ################################################################################################################### -->
+    strTempEndDate  = string.Append ("End Date")
+    estTrackCondition = script.Call("subF-SetEventsSurveyAndDates", estTrackCondition, strRawSurvey, datSurvey, lstOutAttributes,)
+    estTrackCondition = event.CalculateAttribute (estTrackCondition, forAddOneMonth, strTempEndDate, "date")
+    estTrackCondition = event.SetDatesToAttributes (estTrackCondition, strSurveyDateAttrName, strTempEndDate)
+    estTrackCondition = event.RemoveAttribute (estTrackCondition, strTempEndDate)
+
+    <!--
+    ###################################################################################################################
+      Processing Step 12 - Delete old SDs and save new
+    ################################################################################################################### -->
+
+    survey.Delete (strMovingSumsSurvey)
+    survey.Save (strMovingSumsSurvey, datSurvey, strMSSurveyType, mapMSSurvey)
+
+    event.DeleteByAttribute (strTrackConditionCategory, strSurveyNameAttrName, strRawSurvey)
+    event.Save (estTrackCondition, strTrackConditionCategory, strTrackConditionType)
+
+    <!-- TODO: Move to a release script -->
+    strTMSLayer = string.Append ("Track Condition")
+    layer.CreateEventLayer (strTMSLayer, strTrackConditionCategory, strTrackConditionType)
+
+    end:
+  </Commands>
+
+  <Function logged = "false">
+    <Name>subF-CalculateScoreRange</Name>
+    <Description>
+      Calculates scores from value ranges given as a list of 4 values, for example
+      Average TMS
+      Above or equal to 500	6
+      Between 300 and 499	4
+      Between 200 and 299	2
+      Below 200	0
+    </Description>
+    <Parameter>
+      <Name>estInput</Name>
+      <Type>eventSet</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strSourceAttr</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strTargetAttr</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>intScore1</Name>
+      <Type>integer</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>intScore2</Name>
+      <Type>integer</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>intScore3</Name>
+      <Type>integer</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>intScore4</Name>
+      <Type>integer</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>intLimit1</Name>
+      <Type>integer</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>intLimit2</Name>
+      <Type>integer</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>intLimit3</Name>
+      <Type>integer</Type>
+    </Parameter>
+
+    <Result>
+      <Name>estResult</Name>
+      <Type>eventSet</Type>
+    </Result>
+
+    <Commands>
+
+      forScore1 = formula.Create ("$intScore1")
+      forScore2 = formula.Create ("$intScore2")
+      forScore3 = formula.Create ("$intScore3")
+      forScore4 = formula.Create ("$intScore4")
+
+      <![CDATA[
+      strConLessThanL1 = string.Format ("'%s' < %d", strSourceAttr, intLimit1)
+      strConBetweenL1andL2= string.Format ("'%s' >= %d && '%s' < %d", strSourceAttr, intLimit1, strSourceAttr, intLimit2)
+      strConBetweenL2andL3= string.Format ("'%s' >= %d && '%s' < %d", strSourceAttr, intLimit2, strSourceAttr, intLimit3)
+      ]]>
+
+      forBetweenL2andL3 = formula.Create (strConBetweenL2andL3, forScore3, forScore4)
+      forBetweenL1andL2 = formula.Create (strConBetweenL1andL2, forScore2, forBetweenL2andL3)
+      forLessThanL1 = formula.Create (strConLessThanL1, forScore1, forBetweenL1andL2)
+      estResult = event.CalculateAttribute (estInput, forLessThanL1, strTargetAttr, "integer")
+
+    </Commands>
+  </Function>
+
+
+  <Function logged = "false">
+    <Name>subF-CalculateScoreEqual</Name>
+    <Description>
+      Calculates scores from a list of 4 values, for example
+      Minimum Ballast Fouling Index	1	6
+      value=2	score: 4
+      value=3	score: 2
+      value=4	score: 0
+    </Description>
+
+    <Parameter>
+      <Name>estInput</Name>
+      <Type>eventSet</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strSourceAttr</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strTargetAttr</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>intScore1</Name>
+      <Type>integer</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>intScore2</Name>
+      <Type>integer</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>intScore3</Name>
+      <Type>integer</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>intScore4</Name>
+      <Type>integer</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>intLimit1</Name>
+      <Type>integer</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>intLimit2</Name>
+      <Type>integer</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>intLimit3</Name>
+      <Type>integer</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>intLimit4</Name>
+      <Type>integer</Type>
+    </Parameter>
+
+    <Result>
+      <Name>estResult</Name>
+      <Type>eventSet</Type>
+    </Result>
+
+    <Commands>
+      forScore1 = formula.Create ("$intScore1")
+      forScore2 = formula.Create ("$intScore2")
+      forScore3 = formula.Create ("$intScore3")
+      forScore4 = formula.Create ("$intScore4")
+
+      strConEqualL1 = string.Format ("'%s' >= %d", strSourceAttr, intLimit1)
+      strConEqualL2 = string.Format ("'%s' == %d", strSourceAttr, intLimit2)
+      strConEqualL3 = string.Format ("'%s' == %d", strSourceAttr, intLimit3)
+
+      forEqualL3 = formula.Create (strConEqualL3, forScore3, forScore4)
+      forEqualL2 = formula.Create (strConEqualL2, forScore2, forEqualL3)
+      forEqualL1 = formula.Create (strConEqualL1, forScore1, forEqualL2)
+
+      estResult = event.CalculateAttribute (estInput, forEqualL1, strTargetAttr, "integer")
+
+    </Commands>
+  </Function>
+
+  <Function logged = "false">
+    <Name>subF-SetEventsSurveyAndDates</Name>
+    <Description>Sets "Survey Name" and "Survey Date" attributes, and optionally Channel name</Description>
+    <Parameter>
+      <Name>estInput</Name>
+      <Type>eventSet</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strRawSurvey</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>datSurvey</Name>
+      <Type>date</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>lstRetainAttributes</Name>
+      <Type>list</Type>
+    </Parameter>
+
+    <Parameter required = "false">
+      <Name>strChannel</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Result>
+      <Name>estResult</Name>
+      <Type>eventSet</Type>
+    </Result>
+
+    <Commands>
+      strSurveyNameAttrName = string.Append ("Survey Name")
+      strSurveyDateAttrName = string.Append ("Survey Date")
+      strChannelAttrName = string.Append ("Channel")
+
+      estResult = event.SetAttribute (estInput, strSurveyNameAttrName, strRawSurvey)
+      estResult = event.SetAttribute (estResult, strSurveyDateAttrName, datSurvey)
+      estResult = event.SetDatesToAttributes (estResult, strSurveyDateAttrName, strSurveyDateAttrName)
+      estResult = event.RetainAttributes (estResult, lstRetainAttributes)
+      control.GoToIf("$strChannel==null", "end")
+      estResult = event.SetAttribute (estResult, strChannelAttrName, strChannel)
+      end:
+
+    </Commands>
+  </Function>
+
+  <Function logged = "false">
+    <Name>subF-GetAttribute</Name>
+    <Description>Adds a given attribute name to the given list and returns a string variable holding the given attribute name</Description>
+
+    <Parameter>
+      <Name>lstAttributes</Name>
+      <Type>list</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strAttributeName</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Result>
+      <Name>strAttributeName</Name>
+      <Type>string</Type>
+    </Result>
+
+    <Commands>
+      collection.ListAdd (lstAttributes, strAttributeName)
+    </Commands>
+  </Function>
+
+  <Function logged = "false">
+    <Name>subF-RoundAttributeValue</Name>
+    <Description>Set "Survey Name" and "Survey Date" attributes, and nationally channel name</Description>
+
+    <Parameter>
+      <Name>estInput</Name>
+      <Type>eventSet</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strAttributeToRound</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Result>
+      <Name>estResult</Name>
+      <Type>eventSet</Type>
+    </Result>
+
+    <Commands>
+      strRoundValue = string.Format ("round ('%s'* 100.0)/100.0 ", strAttributeToRound)
+      forRoundValue = formula.Create (strRoundValue)
+      estResult = event.CalculateAttribute (estInput, forRoundValue, strAttributeToRound, "double")
+
+    </Commands>
+  </Function>
+
+  <Function logged = "false">
+    <Name>subF-GetAttributeSumFormula</Name>
+    <Description>Creates a formula which adds attributes given as a list</Description>
+
+    <Parameter>
+      <Name>lstAttributeNames</Name>
+      <Type>list</Type>
+    </Parameter>
+
+    <Result>
+      <Name>forSumAttributes</Name>
+      <Type>formula</Type>
+    </Result>
+
+    <Commands>
+      intAttributeCount = collection.Size(lstAttributeNames)
+      intIndex = util.Assign(0)
+      forNextIndex = formula.Create("$intIndex + 1")
+      strSum = util.Assign ("0")
+      loopBegin:
+      control.GoToIf("$intIndex == $intAttributeCount", "loopEnd")
+      strAttributeName = collection.ListGet(lstAttributeNames, intIndex)
+      strSum = string.Format ("%s + '%s'", strSum, strAttributeName)
+      intIndex = formula.Evaluate(forNextIndex, , "integer")
+      control.GoTo("loopBegin")
+      loopEnd:
+
+      forSumAttributes = formula.Create (strSum)
+
+    </Commands>
+  </Function>
+</Script>

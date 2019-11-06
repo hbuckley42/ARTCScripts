@@ -1,0 +1,348 @@
+<?xml version = "1.0" encoding = "utf-8" ?>
+
+<Script>
+
+  <Description>Aligns AK survey.</Description>
+  <Version>1.4</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter>
+    <Name>strSurvey</Name>
+    <Type>string</Type>
+    <Source>survey</Source>
+    <Alias>Survey:</Alias>
+    <Default>^IMP-AK_Combined.*</Default>
+  </Parameter>
+
+  <Commands>
+
+    <!--
+    ##################################################################################################
+
+    Input:
+      Survey Name:      From strSurvey parameter
+      Survey Type:      AK Combined
+      Channels:         Board Speed
+                        Curvature
+                        Left Gauge Face Wear
+                        Left Gauge Face Angle
+                        Left Head Height 16mm
+                        Left Head Loss
+                        Left Head Width
+                        Left Loss of Width
+                        Left Match Index
+                        Left Rail Cant
+                        Left Vertical Wear 16mm
+                        Radius
+                        Right Gauge Face Wear
+                        Right Gauge Face Angle
+                        Right Head Height 16mm
+                        Right Head Loss
+                        Right Head Width
+                        Right Loss of Width
+                        Right Match Index
+                        Right Rail Cant
+                        Right Vertical Wear 16mm
+                        SD Top Left
+                        SD Top Right
+                        SD Twist 14
+                        SD Twist 2
+                        Speed
+                        Super Elevation Float
+                        TMS Left
+                        TMS Right
+                        Top Left 3.6
+                        Top Right 3.6
+                        Twist 14 Xtn
+                        Twist 2
+                        Versine Left
+                        Versine Right
+                        xGauge
+                        xGradient
+                        xLeft Align 20m
+                        xLeft Surface 20m
+                        xRight Align 20m
+                        xRight Surface 20m
+
+      Survey Name:      Multiple surveys
+      Survey Type:      Baseline AK
+      Channels:         Curvature
+                        Twist Xtn
+
+    Output:
+      Survey Name:      Imported survey name with IMP- prefix replaced with ALN-
+      Survey Type:      Aligned AK
+      Channels:         Same as imported survey
+
+      Survey Name:      Renamed imported survey with IMP- prefix replaced with PRO-
+      Survey Type:      AK Combined
+
+    ##################################################################################################
+    -->
+
+    <!-- Check for name including wildcards, indicating no matching files found -->
+
+    bolHasWildcards = script.Call ("BPS-F-CheckForWildcards.spf", strSurvey)
+    control.GoToIf ("$bolHasWildcards", "End")
+
+    <!-- Check survey is an imported or processed AK survey -->
+
+    test.FailIfNotMatch (strSurvey, "^(IMP|PRO)-AK_Combined_[0-9]+_[0-9]{8}$", "", "Survey must be an imported AK survey.")
+
+    <!--
+    ##################################################################################################
+    Initialise
+    ##################################################################################################
+    -->
+
+    <!-- Imported and Processed survey names and channels -->
+
+    strImportedSurvey = string.ReplaceRegex (strSurvey, "^(IMP|PRO)-", "IMP-")
+    strProcessedSurvey = string.ReplaceRegex (strSurvey, "^(IMP|PRO)-", "PRO-")
+
+    lisChannels = collection.ListCreate (
+                                          "Board Speed",
+                                          "Curvature",
+                                          "Left Gauge Face Wear",
+                                          "Left Gauge Face Angle",
+                                          "Left Head Height 16mm",
+                                          "Left Head Loss",
+                                          "Left Head Width",
+                                          "Left Loss of Width",
+                                          "Left Match Index",
+                                          "Left Rail Cant",
+                                          "Left Vertical Wear 16mm",
+                                          "Radius",
+                                          "Right Gauge Face Wear",
+                                          "Right Gauge Face Angle",
+                                          "Right Head Height 16mm",
+                                          "Right Head Loss",
+                                          "Right Head Width",
+                                          "Right Loss of Width",
+                                          "Right Match Index",
+                                          "Right Rail Cant",
+                                          "Right Vertical Wear 16mm",
+                                          "SD Top Left",
+                                          "SD Top Right",
+                                          "SD Twist 14",
+                                          "SD Twist 2",
+                                          "Speed",
+                                          "Super Elevation Float",
+                                          "TMS Left",
+                                          "TMS Right",
+                                          "Top Left 3.6",
+                                          "Top Right 3.6",
+                                          "Twist 14 Xtn",
+                                          "Twist 2",
+                                          "Versine Left",
+                                          "Versine Right",
+                                          "xGauge",
+                                          "xGradient",
+                                          "xLeft Align 20m",
+                                          "xLeft Surface 20m",
+                                          "xRight Align 20m",
+                                          "xRight Surface 20m"
+                                        )
+
+    <!-- Baseline survey name, type and channels -->
+
+    strBaselineSurvey = string.ReplaceRegex (strSurvey, "^(IMP|PRO)-", "BAS-")
+    strBaselineSurveyType = string.Append ("Baseline AK")
+    strCurvatureChannel = string.Append ("Curvature")
+    strTwistChannel = string.Append ("Twist 14 Xtn")
+
+    <!-- Aligned survey name, type and channels -->
+
+    strAlignedSurvey = string.ReplaceRegex (strSurvey, "^(IMP|PRO)-", "ALN-")
+    strAlignedSurveyType = string.Append ("Aligned AK")
+
+	strCalculated6mMSLeftChannel = string.Append ("Calculated 6mMS Left")
+	strCalculated6mMSRightChannel = string.Append ("Calculated 6mMS Right")
+	strCalculatedLMSLeftChannel = string.Append ("Calculated LMS Left")
+	strCalculatedLMSRightChannel = string.Append ("Calculated LMS Right")
+	strCalculatedTMSLeftChannel = string.Append ("Calculated TMS Left")
+	strCalculatedTMSRightChannel = string.Append ("Calculated TMS Right")
+
+	strAlign20mLeftChannel = string.Append ("xLeft Align 20m")
+	strAlign20mRightChannel = string.Append ("xRight Align 20m")
+	strSurface20mLeftChannel = string.Append ("xLeft Surface 20m")
+	strSurface20mRightChannel = string.Append ("xRight Surface 20m")
+	strTop3Pt6mLeftChannel = string.Append ("Top Left 3.6")
+	strTop3Pt6mRightChannel = string.Append ("Top Right 3.6")
+
+    <!-- Units -->
+
+    uniMetre = unit.GetUnit ("Metric", "metre")
+
+    <!--
+    ##################################################################################################
+    Processing Step 1 - Load data
+      a. Load imported survey channels
+      b. Load baseline surveys overlapping the imported survey
+    ##################################################################################################
+    -->
+
+    mapImportedSurvey = script.Call ("BPS-F-LoadSurvey.spf", strSurvey, lisChannels)
+
+    srmImportedCurvature = collection.MapGet (mapImportedSurvey, strCurvatureChannel)
+    estSurvey = stream.ToEvents (srmImportedCurvature)
+
+    <!-- Load baseline curvature and twist channels -->
+
+    lstChannels = collection.ListCreate (strCurvatureChannel, strTwistChannel)
+    lstTypes = collection.ListCreate (strBaselineSurveyType, strBaselineSurveyType)
+    mapBaselineChannels = stream.LoadAggregated (lstChannels, lstTypes, estSurvey, "LatestSurveyOnOrBeforeDate")
+    srmBaselineCurvature = collection.MapGet (mapBaselineChannels, strCurvatureChannel)
+    srmBaselineTwist = collection.MapGet (mapBaselineChannels, strTwistChannel)
+
+    <!--
+    ##################################################################################################
+    Processing Step 2 - Alignment
+       a. Compute swept mean of imported curvature (baseline already stored as swept mean)
+       b. Resample baseline curvature to imported and calculate alignment
+       c. Apply alignment displacement to imported survey
+       d. Get first aligned twist channel and compute swept mean
+       e. Compute swept mean for baseline twist
+       f. Resample baseline twist to imported and calculate second alignment
+       g. Apply second alignment displacement to imported survey
+    ##################################################################################################
+    -->
+
+    <!-- Calculate first alignment using curvature swept mean and apply alignment displacement to survey -->
+
+    srmImportedCurvature = stream.ComputeSwept (srmImportedCurvature, "Mean", 20)
+    srmBaselineCurvature = stream.ResampleToStream (srmBaselineCurvature, srmImportedCurvature, false)
+    srmFirstDisplacement = stream.GetAlignment (srmImportedCurvature, srmBaselineCurvature, 3000.0, uniMetre, 500.0, uniMetre, 200.0, uniMetre, 0.80)
+
+    mapAlignedSurvey = script.Call ("BPS-F-AlignSurvey.spf", mapImportedSurvey, srmFirstDisplacement)
+
+    <!-- Calculate second alignment using twist swept mean and apply alignment displacement to survey -->
+
+    srmTwistAfterFirstAlignment = collection.MapGet (mapAlignedSurvey, strTwistChannel)
+    srmTwistAfterFirstAlignment = stream.ComputeSwept (srmTwistAfterFirstAlignment, "Mean", 5)
+
+    srmBaselineTwist = stream.ComputeSwept (srmBaselineTwist, "Mean", 5)
+    srmBaselineTwist = stream.ResampleToStream (srmBaselineTwist, srmTwistAfterFirstAlignment, false)
+
+    srmSecondDisplacement = stream.GetAlignment (srmTwistAfterFirstAlignment, srmBaselineTwist, 200.0, uniMetre, 50.0, uniMetre, 20.0, uniMetre, 0.90)
+
+    mapAlignedSurvey = script.Call ("BPS-F-AlignSurvey.spf", mapAlignedSurvey, srmSecondDisplacement)
+
+    <!--
+    ###################################################################################################################
+    Processing Step 3 - Cleanse data
+      a. For rail profile head measurements, replace 0 with nulls
+    ###################################################################################################################
+    -->
+
+	lisRPHeadChannels = collection.ListCreate (
+                                                "Left Head Height 16mm", "Left Head Loss", "Left Head Width",
+                                                "Right Head Height 16mm", "Right Head Loss", "Right Head Width"
+                                              )
+
+	mapAlignedSurvey = script.Call ("BPS-F-SurveyReplaceValues.spf", mapAlignedSurvey, lisRPHeadChannels, 0.0, 1, NaN)
+
+    <!--
+    ###################################################################################################################
+    Processing Step 4 - Compoute additional channels
+      a. Calculate Left and Right TMS from Surface 20m channels
+      a. Calculate Left and Right LMS from Align 20m channels
+      a. Calculate Left and Right 6mMS from Top 3.6m channels
+	  ###################################################################################################################
+    -->
+
+	mapAlignedSurvey = script.Call ("subF-Calculate50mMovingSum", mapAlignedSurvey, strSurface20mLeftChannel, strCalculatedTMSLeftChannel)
+	mapAlignedSurvey = script.Call ("subF-Calculate50mMovingSum", mapAlignedSurvey, strSurface20mRightChannel, strCalculatedTMSRightChannel)
+
+	mapAlignedSurvey = script.Call ("subF-Calculate50mMovingSum", mapAlignedSurvey, strAlign20mLeftChannel, strCalculatedLMSLeftChannel)
+	mapAlignedSurvey = script.Call ("subF-Calculate50mMovingSum", mapAlignedSurvey, strAlign20mRightChannel, strCalculatedLMSRightChannel)
+
+	mapAlignedSurvey = script.Call ("subF-Calculate50mMovingSum", mapAlignedSurvey, strTop3Pt6mLeftChannel, strCalculated6mMSLeftChannel)
+	mapAlignedSurvey = script.Call ("subF-Calculate50mMovingSum", mapAlignedSurvey, strTop3Pt6mRightChannel, strCalculated6mMSRightChannel)
+
+<!--
+	srmSurface20mLeft = collection.MapGet (mapSurveyAfterSecondAlignment, strSurface20mLeftChannel)
+	srmCalculatedTMSLeft = stream.Absolute (srmSurface20mLeft)
+	srmCalculatedTMSLeft = stream.ComputeSwept (srmCalculatedTMSLeft, "Mean", 50)
+	srmCalculatedTMSLeft = stream.Math (srmCalculatedTMSLeft, "*", 100.0)
+
+	srmSurface20mRight = collection.MapGet (mapSurveyAfterSecondAlignment, strSurface20mRightChannel)
+	srmCalculatedTMSRight = stream.Absolute (srmSurface20mRight)
+	srmCalculatedTMSRight = stream.ComputeSwept (srmCalculatedTMSRight, "Mean", 50)
+	srmCalculatedTMSRight = stream.Math (srmCalculatedTMSRight, "*", 100.0)
+
+	collection.MapPut (mapSurveyAfterSecondAlignment, strCalculatedTMSLeftChannel, srmCalculatedTMSLeft)
+	collection.MapPut (mapSurveyAfterSecondAlignment, strCalculatedTMSRightChannel, srmCalculatedTMSRight)
+-->
+    <!--
+    ###################################################################################################################
+    Processing Step 4 - Save surveys
+      a. Remove any existing aligned survey and save aligned survey, granting appropriate permissions
+      b. Rename imported survey to processed, if not already processed
+    ###################################################################################################################
+    -->
+
+    survey.Delete (strAlignedSurvey)
+
+    datSurvey = survey.GetDate (strSurvey)
+    survey.Save (strAlignedSurvey, datSurvey, strAlignedSurveyType, mapAlignedSurvey)
+
+    security.GrantSurveyAccess (strAlignedSurvey, "Power User", "RWD")
+    security.GrantSurveyAccess (strAlignedSurvey, "Standard User", "R")
+
+    <!-- Rename imported survey to processed (if not already processed) -->
+
+    bolSurveyExists = survey.Exists (strImportedSurvey)
+    control.GoToIf ("$bolSurveyExists == false", "End")
+        survey.Rename (strImportedSurvey, strProcessedSurvey)
+
+    End:
+
+  </Commands>
+
+<Function logged = "false">
+  <Name>subF-Calculate50mMovingSum</Name>
+  <Description>Fucntion to calculate new 50m swept absolute sum channel</Description>
+  <Version>1.0</Version>
+
+  <Parameter required = "true">
+    <Name>mapSurvey</Name>
+    <Type>map</Type>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strChannelName</Name>
+    <Type>string</Type>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strCalculatedChannelName</Name>
+    <Type>string</Type>
+  </Parameter>
+
+  <Result>
+    <Name>mapSurvey</Name>
+    <Type>map</Type>
+  </Result>
+
+  <Commands>
+
+	<!-- Read base channel from survey map -->
+
+	srmChannel = collection.MapGet (mapSurvey, strChannelName)
+
+	<!-- Compute swept mean of asbolute values of 101 samples, multiply by 100 to get sum of 100 samples -->
+
+	srmCalculatedChannel = stream.Absolute (srmChannel)
+	srmCalculatedChannel = stream.ComputeSwept (srmCalculatedChannel, "Mean", 50)
+	srmCalculatedChannel = stream.Math (srmCalculatedChannel, "*", 100.0)
+
+	<!-- Add new calculated channel to returned survey map -->
+
+	collection.MapPut (mapSurvey, strCalculatedChannelName, srmCalculatedChannel)
+
+  </Commands>
+
+</Function>
+
+</Script>

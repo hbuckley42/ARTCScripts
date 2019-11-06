@@ -1,0 +1,260 @@
+﻿<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Script>
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+  <Description>
+    Generates TG Mock Data
+    NOTE: *** it also deletes any old TG mock stream data including SDs
+  </Description>
+
+  <Parameter>
+    <Name>strSurveyToProcess</Name>
+    <Source>survey</Source>
+    <Type>string</Type>
+    <Alias>Survey Name:</Alias>
+    <Default>IMP-AK Track Geometry Run 32593 20190121</Default>
+  </Parameter>
+
+  <Commands>
+
+    <!-- Delete existing mock data
+    event.DeleteByCategory ("Track Geometry SD") -->
+    script.Call("subF-DeleteMockSurveys")
+
+
+    <!-- degrade future surveys from 2019-01-21-->
+    script.Call("subF-GenerateMockSurvey", strSurveyToProcess, "2019-02-21", 0.1, 0.001, 5)
+    script.Call("subF-GenerateMockSurvey", "IMP-AK Track Geometry Run Mock 2019-02-21", "2019-03-21", 0.1, 0.001, 5)
+
+
+    <!-- improve a few surveys in the past from 2019-01-21 back to 2018-->
+
+    script.Call("subF-GenerateMockSurvey", strSurveyToProcess, "2018-12-21", -0.15, -0.02, 5)
+    script.Call("subF-GenerateMockSurvey", "IMP-AK Track Geometry Run Mock 2018-12-21", "2018-11-21", -0.15, -0.001, 5)
+    script.Call("subF-GenerateMockSurvey", "IMP-AK Track Geometry Run Mock 2018-11-21", "2018-10-21", -0.15, -0.001, 5)
+    script.Call("subF-GenerateMockSurvey", "IMP-AK Track Geometry Run Mock 2018-10-21", "2018-09-21", -0.15, -0.001, 5)
+    script.Call("subF-GenerateMockSurvey", "IMP-AK Track Geometry Run Mock 2018-09-21", "2018-08-21", -0.15, -0.001, 5)
+    script.Call("subF-GenerateMockSurvey", "IMP-AK Track Geometry Run Mock 2018-08-21", "2018-07-21", -0.15, -0.001, 5)
+    script.Call("subF-GenerateMockSurvey", "IMP-AK Track Geometry Run Mock 2018-07-21", "2018-06-21", -0.15, -0.001, 5)
+
+    <!-- degrade fro surveys from 2017 into a future-->
+
+    script.Call("subF-GenerateMockSurvey", strSurveyToProcess, "2017-09-21", -0.9, -0.001, 5)
+    script.Call("subF-GenerateMockSurvey", "IMP-AK Track Geometry Run Mock 2017-09-21", "2017-10-21", 0.175, 0.001, 5)
+    script.Call("subF-GenerateMockSurvey", "IMP-AK Track Geometry Run Mock 2017-10-21", "2017-11-21", 0.175, 0.001, 5)
+    script.Call("subF-GenerateMockSurvey", "IMP-AK Track Geometry Run Mock 2017-11-21", "2017-12-21", 0.175, 0.001, 5)
+    script.Call("subF-GenerateMockSurvey", "IMP-AK Track Geometry Run Mock 2017-12-21", "2018-01-21", 0.175, 0.001, 5)
+    script.Call("subF-GenerateMockSurvey", "IMP-AK Track Geometry Run Mock 2018-01-21", "2018-02-21", 0.175, 0.001, 5)
+    script.Call("subF-GenerateMockSurvey", "IMP-AK Track Geometry Run Mock 2018-02-21", "2018-03-21", 0.175, 0.001, 5)
+    script.Call("subF-GenerateMockSurvey", "IMP-AK Track Geometry Run Mock 2018-03-21", "2018-04-21", 0.175, 0.001, 5)
+    script.Call("subF-GenerateMockSurvey", "IMP-AK Track Geometry Run Mock 2018-04-21", "2018-05-21", 0.175, 0.001, 5)
+
+    end:
+  </Commands>
+
+  <Function>
+
+    <Name>subF-GenerateMockSurvey</Name>
+    <Parameter>
+      <Name>strSurveyToProcess</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strSurveyDate</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>dblWeight</Name>
+      <Type>double</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>dblCurveWeight</Name>
+      <Type>double</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>intComputeSweptMeanWindow</Name>
+      <Type>integer</Type>
+    </Parameter>
+
+    <Commands>
+
+      <!-- 
+    ##################################################################################################
+
+    ################################################################################################## -->
+
+      strSurveyToSave = string.Format ("IMP-AK Track Geometry Run Mock %S", strSurveyDate)
+      datSurveyDate = util.ParseDate (strSurveyDate, "yyyy-MM-dd")
+      strSurveyType = util.Assign ("AK Track Geometry")
+
+      strCurveComponentCategory = util.Assign ("Curve Component")
+      strChannelNameGauge   = util.Assign ("Gauge")
+      strChannelNameTwist10 = util.Assign ("Twist10")
+      strChannelNameTwist14 = util.Assign ("Twist14")
+      strChannelNameTwist14Xtn = util.Assign ("Twist14Xtn")
+      strChannelNameTwist2 = util.Assign ("Twist2")
+      strChannelNameTopLeft = util.Assign ("Top Left")
+      strChannelNameTopRight = util.Assign ("Top Right")
+      strChannelNameSurfaceLeft20m = util.Assign ("Surface Left 20m")
+      strChannelNameSurfaceRight20m = util.Assign ("Surface Right 20m")
+      strChannelNameVersineLeft20m = util.Assign ("Versine Left 20m")
+      strChannelNameVersineRight20m = util.Assign ("Versine Right 20m")
+      strChannelNameSuperElevationFloat = util.Assign ("Super Elevation Float")
+
+      strChannelNameAlignLelft20m = util.Assign ("Align Lelft 20m")
+      strChannelNameAlignRight20m = util.Assign ("Align Right 20m")
+      strChannelNameAlignLelft50m = util.Assign ("Align Lelft 50m")
+      strChannelNameAlignRight50m = util.Assign ("Align Right 50m")
+
+      strChannelNameTMSLeft = util.Assign ("TMS Left")
+      strChannelNameTMSRight = util.Assign ("TMS Right")
+
+      uniMetre = unit.GetUnit ("Metric", "metre")
+
+      srmTwist10 = stream.Load (strSurveyToProcess, strChannelNameTwist10)
+      trvSurvey = stream.ToTraversals (srmTwist10)
+
+      estWeight = event.CreateOnTraversalsBetweenMarkers (trvSurvey, 1)
+      estWeight = event.SetAttribute (estWeight, "Weight", dblWeight)
+      srmWeight = event.ToStream (estWeight, "Weight", 0.5, uniMetre)
+      srmWeight = stream.ResampleToStream (srmWeight, srmTwist10, true)
+
+      estCurve = event.LoadByTraversal (strCurveComponentCategory, , , trvSurvey)
+      estCurve = event.RetainAttribute (estCurve, "Side")
+      forWeight = formula.Create ("abs('Side') * $dblCurveWeight")
+      estCurve = event.CalculateAttribute (estCurve, forWeight, "Weight", "double")
+      srmCurve = event.ToStream (estCurve, "Weight", 0.5, uniMetre)
+      srmCurve = stream.ResampleToStream (srmCurve, srmTwist10, true)
+
+      srmWeight = stream.Math (srmWeight, "+", srmCurve)
+
+      mapChannels = collection.MapCreate ()
+      script.Call("subF-CreateMockStream", strSurveyToProcess, strChannelNameGauge, srmWeight, mapChannels, intComputeSweptMeanWindow, 0.5)
+      script.Call("subF-CreateMockStream", strSurveyToProcess, strChannelNameTwist10, srmWeight, mapChannels, intComputeSweptMeanWindow, 1.0)
+      script.Call("subF-CreateMockStream", strSurveyToProcess, strChannelNameTwist14, srmWeight, mapChannels, intComputeSweptMeanWindow, 1.0)
+      script.Call("subF-CreateMockStream", strSurveyToProcess, strChannelNameTwist14Xtn, srmWeight, mapChannels, intComputeSweptMeanWindow, 1.0)
+      script.Call("subF-CreateMockStream", strSurveyToProcess, strChannelNameTwist2, srmWeight, mapChannels, intComputeSweptMeanWindow, 1.0)
+      script.Call("subF-CreateMockStream", strSurveyToProcess, strChannelNameTopLeft , srmWeight, mapChannels, intComputeSweptMeanWindow, 1.0)
+      script.Call("subF-CreateMockStream", strSurveyToProcess, strChannelNameTopRight, srmWeight, mapChannels, intComputeSweptMeanWindow, 1.0)
+      script.Call("subF-CreateMockStream", strSurveyToProcess, strChannelNameSurfaceLeft20m , srmWeight, mapChannels, intComputeSweptMeanWindow, 1.0)
+      script.Call("subF-CreateMockStream", strSurveyToProcess, strChannelNameSurfaceRight20m, srmWeight, mapChannels, intComputeSweptMeanWindow, 1.0)
+      script.Call("subF-CreateMockStream", strSurveyToProcess, strChannelNameVersineLeft20m , srmWeight, mapChannels, intComputeSweptMeanWindow, -0.01)
+      script.Call("subF-CreateMockStream", strSurveyToProcess, strChannelNameVersineRight20m, srmWeight, mapChannels, intComputeSweptMeanWindow, -0.01)
+      script.Call("subF-CreateMockStream", strSurveyToProcess, strChannelNameSuperElevationFloat, srmWeight, mapChannels, intComputeSweptMeanWindow, -0.01)
+
+      script.Call("subF-CreateMockStream", strSurveyToProcess, strChannelNameAlignLelft20m, srmWeight, mapChannels, intComputeSweptMeanWindow, 1.0)
+      script.Call("subF-CreateMockStream", strSurveyToProcess, strChannelNameAlignRight20m, srmWeight, mapChannels, intComputeSweptMeanWindow, 1.0)
+      script.Call("subF-CreateMockStream", strSurveyToProcess, strChannelNameAlignLelft50m, srmWeight, mapChannels, intComputeSweptMeanWindow, 1.0)
+      script.Call("subF-CreateMockStream", strSurveyToProcess, strChannelNameAlignRight50m, srmWeight, mapChannels, intComputeSweptMeanWindow, 1.0)
+
+
+      script.Call("subF-CreateMockStream", strSurveyToProcess, strChannelNameTMSLeft, srmWeight, mapChannels, intComputeSweptMeanWindow, 1.0)
+      script.Call("subF-CreateMockStream", strSurveyToProcess, strChannelNameTMSRight, srmWeight, mapChannels, intComputeSweptMeanWindow, 1.0)
+
+      srmTest = collection.MapGet (mapChannels, strChannelNameTMSLeft)
+      console.ShowValue ("srmTest", srmTest)
+      survey.Delete (strSurveyToSave)
+      survey.Save (strSurveyToSave, datSurveyDate, strSurveyType, mapChannels)
+
+      <!-- Product Defect - survey dates are not set on save, below is a workaround
+      survey.SetDate (strSurveyToSave, datSurveyDate)
+      strProcParam = string.Format ("'%s'", strSurveyToSave)
+      database.ExecuteProcedure("dbo.ORIP_REFRESH_CHANNEL_Q_TABLE", strProcParam, false)
+-->
+    </Commands>
+  </Function>
+
+  <Function>
+    <Name>subF-CreateMockStream</Name>
+
+    <Description>
+
+    </Description>
+
+    <Parameter>
+      <Name>strSurveyToProcess</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strChannelName</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>srmWeight</Name>
+      <Type>stream</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>mapChannels</Name>
+      <Type>map</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>intComputeSweptMeanWindow</Name>
+      <Type>integer</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>dblWeightSign</Name>
+      <Type>double</Type>
+    </Parameter>
+
+    <Commands>
+
+      srmWeight = stream.Math (srmWeight, "*", dblWeightSign)
+      srmChannel = stream.Load (strSurveyToProcess, strChannelName)
+      srmMockChannel = stream.ComputeSweptMean (srmChannel, intComputeSweptMeanWindow)
+      srmMockChannel = stream.Math (srmMockChannel, "*", srmWeight)
+      srmMockChannel = stream.Math (srmMockChannel, "+", srmChannel)
+
+      collection.MapPut (mapChannels, strChannelName, srmMockChannel)
+
+    </Commands>
+  </Function>
+  <Function>
+    <Name>subF-DeleteMockSurveys</Name>
+    <Description>Deletes a survey</Description>
+    <Commands>
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2019-05-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2019-04-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2019-03-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2019-02-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2019-01-21")
+
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2018-01-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2018-02-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2018-03-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2018-04-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2018-05-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2018-06-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2018-07-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2018-08-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2018-09-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2018-10-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2018-11-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2018-12-21")
+
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2017-01-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2017-02-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2017-03-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2017-04-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2017-05-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2017-06-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2017-07-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2017-08-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2017-09-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2017-10-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2017-11-21")
+      survey.Delete ("IMP-AK Track Geometry Run Mock 2017-12-21")
+
+
+    </Commands>
+  </Function>
+</Script>

@@ -1,0 +1,154 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Script>
+  <Description>Imports assets for a corridor</Description>
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter required = "true">
+    <Name>strUsername</Name>
+    <Type>string</Type>
+    <Source>user</Source>
+    <Default>DataAdmin</Default>
+    <Alias>User File Owner</Alias>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strDataFile</Name>
+    <Type>string</Type>
+    <Alias>File Name:</Alias>
+    <Source>userFile</Source>
+    <Default>import-data/asset/.*</Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strSuccessFolderName</Name>
+    <Type>string</Type>
+    <Alias>Success Folder Name:</Alias>
+    <Source>userFolder</Source>
+    <Default>processed-data/asset</Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strFailedFolderName</Name>
+    <Type>string</Type>
+    <Alias>Failed Folder Name:</Alias>
+    <Source>userFolder</Source>
+    <Default>failed-data/asset</Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+  </Parameter>
+
+  <Commands>
+
+    script.SetLogLevel ("info")
+
+    <!-- Check for name including wildcards, indicating no matching files found -->
+
+    bolHasWildcards = script.Call ("BPS-F-CheckForWildcards.spf", strDataFile)
+    control.GoToIf ("$bolHasWildcards", "End")
+
+    <!-- Validate filename, filename: <corridor>_equip_<assetType>s_<yyyymmdd>.csv, with optional path -->
+
+    strFilename = string.ReplaceRegex (strDataFile, "^.*(\\\\|/)", "")
+    strCheckFilename = string.ReplaceRegex (strFilename, "^[A-Z][0-9]+_equip_.+_[0-9]{8}[.]csv$", "")
+    test.FailIfNotEqual (strCheckFilename, "", "", "Filename is an invalid format")
+
+    <!-- Define units -->
+
+    uniMetre = unit.GetUnit ("SI", "metre")
+
+    <!-- Get corridor name and asset type from filename -->
+
+    strCorridor = string.ReplaceRegex (strFilename, "_.*$", "")
+    strAssetType = string.ReplaceRegex (strFilename, "^[A-Z][0-9]+_equip_(.+)s_[0-9]{8}[.]csv$", "$1")
+    strAssetType = string.ReplaceRegex (strAssetType, "_", " ")
+
+    <!-- Move import file to success or failed folder, depending on script outcome -->
+
+    script.MoveFileOnCompletion (strUsername, strDataFile, strSuccessFolderName, strFailedFolderName)
+
+    <!-- DLD is ARTC-Asset_<assetType>.dld -->
+
+    strDLD = string.Append ("ARTC-Asset_", strAssetType, ".dld")
+
+    <!-- Delete any existing assets on the corridor and import the new assets -->
+
+    script.Call ("subF-DeleteAssetsByCorridor", strAssetType, strCorridor)
+
+    uflDataFile = userfile.GetUserFile (strUsername, strDataFile)
+    iNumImported = asset.ImportFile (uflDataFile, , strDLD)
+
+    strMessage = string.Format ("Imported %d %s assets for corridor %s", iNumImported, strAssetType, strCorridor)
+    console.ShowValue (strMessage, "")
+
+    <!-- Locate assets on tracks -->
+
+    script.Call ("ARTC-F-LocateAssetsOnTrack.spf", strCorridor, strAssetType)
+
+  </Commands>
+
+  <!--
+  ##################################################################################################
+  Delete assets from corridor
+  ##################################################################################################
+  -->
+
+  <Function logged = "false">
+    <Name>subF-DeleteAssetsByCorridor</Name>
+
+    <Description>
+      Deletes all assets of the supplied type on a corridor.
+    </Description>
+
+    <Parameter>
+      <Name>strAssetType</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strCorridor</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Commands>
+
+      <!-- Set asset offsets, use different variants depending on the asset type -->
+
+      control.GoToIf ("$strAssetType == \"Culvert\"", "Culvert", "$strAssetType == \"Joint\"", "Joint", "$strAssetType == \"Level Crossing\"", "LevelCrossing") 
+
+        lisSubAssetTypes = collection.ListCreate (strAssetType)
+        control.GoTo ("EndIfAssetType")
+
+      Culvert:
+        lisSubAssetTypes = collection.ListCreate ("Culvert - Small", "Culvert - Large", "Culvert - Unknown Size")
+        control.GoTo ("EndIfAssetType")
+
+      Joint:
+        lisSubAssetTypes = collection.ListCreate ("Joint - AC", "Joint - GD", "Joint - GD/AC")
+        control.GoTo ("EndIfAssetType")
+
+      LevelCrossing:
+        lisSubAssetTypes = collection.ListCreate ("Level Crossing - Private", "Level Crossing - Public")
+        control.GoTo ("EndIfAssetType")
+ 
+      EndIfAssetType:
+
+      <!-- Formulas -->
+
+      forIndexDecrement = formula.Create ("$intIndex - 1")
+
+      <!-- Delete the assets -->
+
+      intIndex = collection.Size (lisSubAssetTypes)
+      BeginLoopDeleteAssets:
+        intIndex = formula.Evaluate (forIndexDecrement, , "integer")
+        strAssetType = collection.ListGet (lisSubAssetTypes, intIndex)
+        asset.Delete (strAssetType, strCorridor)
+        control.GoToIf ("$intIndex > 0", "BeginLoopDeleteAssets")
+
+    </Commands>
+  </Function>
+
+</Script>

@@ -1,0 +1,194 @@
+<?xml version = "1.0" encoding = "utf-8" ?>
+
+<Script>
+
+  <Description>Aligns ICW survey.</Description>
+  <Version>1.2</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter>
+    <Name>strSurvey</Name>
+    <Type>string</Type>
+    <Source>survey</Source>
+    <Alias>Survey:</Alias>
+    <Default>^IMP-ICW.*</Default>
+  </Parameter>
+
+  <Commands>
+
+    <!--
+    ##################################################################################################
+
+    Input:
+      Survey Name:      From strSurvey parameter
+      Survey Type:      ICW
+      Channels:         Acc1
+                        Acc2
+                        Acc3
+                        Acc4
+                        Body Rock Front
+                        Body Rock Rear
+                        Bounce Front
+                        Bounce Rear
+                        Brake Cylinder
+                        Intrain Force
+                        LP1
+                        LP2
+                        LP3
+                        LP4
+                        Rail Profile Left
+                        Rail Profile Right
+						SND
+                        Speed
+                        Twist 14m
+                        Twist 2m
+						Vacc
+
+      Survey Name:      Multiple surveys
+      Survey Type:      Baseline ICW
+      Channels:         Twist 14m
+
+    Output:
+      Survey Name:      Imported survey name with IMP- prefix replaced with ALN-
+      Survey Type:      Aligned ICW
+      Channels:         Same as imported survey
+
+      Survey Name:      Renamed imported survey with IMP- prefix replaced with PRO-
+      Survey Type:      ICW
+
+    ##################################################################################################
+    -->
+
+    <!-- Check for name including wildcards, indicating no matching files found -->
+
+    bolHasWildcards = script.Call ("BPS-F-CheckForWildcards.spf", strSurvey)
+    control.GoToIf ("$bolHasWildcards", "End")
+
+    <!-- Check survey is an imported or processed ICW survey -->
+
+    test.FailIfNotMatch (strSurvey, "^(IMP|PRO)-ICW_[0-9]+_[0-9]{8}$", "", "Survey must be an imported ICW survey.")
+
+    <!--
+    ##################################################################################################
+    Initialise
+    ##################################################################################################
+    -->
+
+    <!-- Imported and Processed survey names and channels -->
+
+    strImportedSurvey = string.ReplaceRegex (strSurvey, "^(IMP|PRO)-", "IMP-")
+    strProcessedSurvey = string.ReplaceRegex (strSurvey, "^(IMP|PRO)-", "PRO-")
+    lisChannels = collection.ListCreate (
+                                           "Acc1",
+                                           "Acc2",
+                                           "Acc3",
+                                           "Acc4",
+                                           "Body Rock Front",
+                                           "Body Rock Rear",
+                                           "Bounce Front",
+                                           "Bounce Rear",
+                                           "Brake Cylinder",
+                                           "Intrain Force",
+                                           "LP1",
+                                           "LP2",
+                                           "LP3",
+                                           "LP4",
+                                           "Rail Profile Left",
+                                           "Rail Profile Right",
+										   "SND",
+                                           "Speed",
+                                           "Twist 14m",
+                                           "Twist 2m",
+										   "Vacc"
+                                         )
+
+    <!-- Baseline survey name, type and channel -->
+
+    strBaselineSurvey = string.ReplaceRegex (strSurvey, "^(IMP|PRO)-", "BAS-")
+    strBaselineSurveyType = string.Append ("Baseline ICW")
+    strTwistChannel = string.Append ("Twist 14m")
+
+    <!-- Aligned survey name and type -->
+
+    strAlignedSurvey = string.ReplaceRegex (strSurvey, "^(IMP|PRO)-", "ALN-")
+    strAlignedSurveyType = string.Append ("Aligned ICW")
+
+    <!-- Attribute Names -->
+
+    strLengthAttrName = string.Append ("Length")
+
+    strSurveyNameAttrName = string.Append ("Survey Name")
+    strSurveyDateAttrName = string.Append ("Survey Date")
+    strProcessedDateAttrName = string.Append ("Processed Date")
+
+    lstSurveyAttributes = collection.ListCreate (strSurveyNameAttrName, strSurveyDateAttrName, strProcessedDateAttrName, strLengthAttrName)
+
+    <!-- Units -->
+
+    uniMetre = unit.GetUnit ("Metric", "metre")
+
+    <!--
+    ##################################################################################################
+    Processing Step 1 - Load data
+      a. Load imported survey channels
+      b. Load baseline surveys overlapping the imported survey
+    ##################################################################################################
+    -->
+
+    mapImportedSurvey = script.Call ("BPS-F-LoadSurvey.spf", strSurvey, lisChannels)
+
+    srmImportedTwist = collection.MapGet (mapImportedSurvey, strTwistChannel)
+    estSurvey = stream.ToEvents (srmImportedTwist)
+
+    <!-- Load baseline twist channel -->
+
+    lstChannels = collection.ListCreate (strTwistChannel)
+    lstTypes = collection.ListCreate (strBaselineSurveyType)
+    mapBaselineChannels = stream.LoadAggregated (lstChannels, lstTypes, estSurvey, "LatestSurveyOnOrBeforeDate")
+    srmBaselineTwist = collection.MapGet (mapBaselineChannels, strTwistChannel)
+
+    <!--
+    ##################################################################################################
+    Processing Step 2 - Alignment
+       a. Compute swept mean for imported and baseline twist
+       b. Resample baseline twist to imported and calculate alignment
+       c. Apply alignment displacement to imported survey
+    ##################################################################################################
+    -->
+
+    srmImportedTwist = stream.ComputeSwept (srmImportedTwist, "Mean", 5)
+
+    srmBaselineTwist = stream.ComputeSwept (srmBaselineTwist, "Mean", 5)
+    srmBaselineTwist = stream.ResampleToStream (srmBaselineTwist, srmImportedTwist, false)
+
+    srmDisplacement = stream.GetAlignment (srmImportedTwist, srmBaselineTwist, 200.0, uniMetre, 50.0, uniMetre, 20.0, uniMetre, 0.90)
+
+    mapAlignedSurvey = script.Call ("BPS-F-AlignSurvey.spf", mapImportedSurvey, srmDisplacement)
+
+    <!--
+    ###################################################################################################################
+    Processing Step 3 - Save surveys
+      a. Remove any existing aligned survey and save aligned survey, granting appropriate permissions
+      b. Rename imported survey to processed, if not already processed
+    ###################################################################################################################
+    -->
+
+    survey.Delete (strAlignedSurvey)
+
+    datSurvey = survey.GetDate (strSurvey)
+    survey.Save (strAlignedSurvey, datSurvey, strAlignedSurveyType, mapAlignedSurvey)
+
+    security.GrantSurveyAccess (strAlignedSurvey, "Power User", "RWD")
+    security.GrantSurveyAccess (strAlignedSurvey, "Standard User", "R")
+
+    <!-- Rename imported survey to processed (if not already processed) -->
+
+    bolSurveyExists = survey.Exists (strImportedSurvey)
+    control.GoToIf ("$bolSurveyExists == false", "End")
+        survey.Rename (strImportedSurvey, strProcessedSurvey)
+
+    End:
+
+  </Commands>
+
+</Script>

@@ -1,0 +1,92 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Script>
+  <Version>1.0</Version>
+  <Description>Imports ARTC TRV surveys into the OA system</Description>
+
+  <Parameter>
+    <Name>strUsername</Name>
+    <Type>string</Type>
+    <Source>user</Source>
+    <Default>DataAdmin</Default>
+    <Alias>User File Owner</Alias>
+  </Parameter>
+
+  <Parameter>
+    <Name>strSurveyFile</Name>
+    <Type>string</Type>
+    <Alias>File Name:</Alias>
+    <Source>userFile</Source>
+    <Default>import-data/stream/</Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+  </Parameter>
+
+  <Parameter>
+    <Name>strSuccessFolderName</Name>
+    <Type>string</Type>
+    <Alias>Success Folder Name:</Alias>
+    <Source>userFolder</Source>
+    <Default>processed-data/stream</Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+  </Parameter>
+
+  <Parameter>
+    <Name>strFailedFolderName</Name>
+    <Type>string</Type>
+    <Alias>Failed Folder Name:</Alias>
+    <Source>userFolder</Source>
+    <Default>failed-data/stream</Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+  </Parameter>
+
+  <Commands>
+
+    console.ShowValue ("$Copyright: (c) 2018 Bentley Systems, Incorporated. All rights reserved.","")
+    script.SetLogLevel ("error")
+
+    <!-- 
+    ##################################################################################################
+     Steps 
+     a. Get survey type and DLD name from the given filename
+     b. Imports survey
+     TODO: Enable moves files on completions to processed or failed folders  
+     script.MoveFileOnCompletion (strUsername, strSurveyFile, strSuccessFolderName, strFailedFolderName)
+
+    ################################################################################################## -->
+
+    intIndexOfStar = string.IndexOf (strSurveyFile, "*")
+    test.ExitIfNotEqual (intIndexOfStar, -1, "", "There are no surveys to import.")
+
+    strSurveyNameAttr = util.Assign ("Survey Name")
+    strRawSurveyName = string.ReplaceRegex (strSurveyFile, "^.*(\\\\|/)", "")
+
+    <!-- Get survey type and DLD name from the given survey name -->
+    strSurveyType = string.ReplaceRegex (strRawSurveyName, ".*Condition Geometry.*", "AK Track Geometry")
+    strSurveyType = string.ReplaceRegex (strSurveyType, ".*Corrugation.*", "AK Corrugation")
+    strSurveyType = string.ReplaceRegex (strSurveyType, ".*Condition Rail Profile.*", "AK Rail Profile")
+    strSurveyType = string.ReplaceRegex (strSurveyType, "SPENO-Run.*", "SPENO")
+    strSurveyType = string.ReplaceRegex (strSurveyType, ".*TrackCurvature.*", "Track Curvature")
+    strSurveyType = string.ReplaceRegex (strSurveyType, "ICW-artc.*", "ICW")
+
+    strDLDName = string.Append ("ARTC-Survey ", strSurveyType, ".dld")
+
+    uflImportFile = userfile.GetUserFile (strUsername, strSurveyFile)
+
+    survey.ImportFile (uflImportFile, strRawSurveyName, , strSurveyType, strDLDName)
+    strSurveyNameFromAttribute = survey.GetAttribute (strRawSurveyName, strSurveyNameAttr)
+
+    strProcessedSurveyName = string.Append ("PRO-", strSurveyNameFromAttribute)
+    strAlignedSurveyName = string.Append ("ALN-", strSurveyNameFromAttribute)
+    strImportedSurveyName = string.Append ("IMP-", strSurveyNameFromAttribute)
+
+    survey.Delete (strImportedSurveyName)
+    survey.Delete (strProcessedSurveyName)
+    survey.Delete (strAlignedSurveyName)
+
+    survey.Rename (strRawSurveyName, strImportedSurveyName)
+
+    strImportedSurveyName = string.Append ("IMP-", strImportedSurveyName)
+    survey.Delete (strImportedSurveyName)
+
+  </Commands>
+</Script>

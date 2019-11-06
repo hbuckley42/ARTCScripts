@@ -1,0 +1,118 @@
+<?xml version = "1.0" encoding = "utf-8" ?>
+
+<Script>
+
+  <Description>This script creates Create Uniform Length Range Events </Description>
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter>
+    <Name>strCorridor</Name>
+    <Type>string</Type>
+    <Source>corridor</Source>
+    <Alias>Line: </Alias>
+    <Default>10003</Default>
+  </Parameter>
+
+  <Parameter>
+    <Name>dblSegmentLength</Name>
+    <Type>double</Type>
+    <Alias>Segment Length (metres):</Alias>
+    <Default>100.0</Default>
+  </Parameter>
+
+  <Commands>
+    <!--
+    ##################################################################################################
+      Output:
+      Extent Category:  Segmentation
+      Event Types:      intSegmentLength metre
+    ################################################################################################## -->
+
+
+    strKilometreSegmentType = util.Assign ("Kilometre")
+    strSegmentCategoryName = string.Append ("Segment")
+    strAttrSegmentID = util.Assign ("Segment ID")
+    strAttrSegment = util.Assign ("Segment")
+
+    strSegmentType = string.Format ("%.0f metre", dblSegmentLength)
+    strStartDateAttrName = string.Append ("Start Date")
+    strEndDateAttrName = string.Append ("End Date")
+
+
+    uniMetre = unit.GetUnit ("Metric", "metre")
+
+    estKilometreSegment = event.LoadByCorridor (strSegmentCategoryName, strKilometreSegmentType, , , strCorridor)
+    estKilometreSegment = event.RemoveAttribute (estKilometreSegment, strAttrSegmentID)
+
+    forNumberOfEvents = formula.Create ("round(1000/$dblSegmentLength)")
+    intNumberOfEvents = formula.Evaluate (forNumberOfEvents, ,"integer")
+    strSegment = string.Format ("%d", intNumberOfEvents)
+    estSegment = event.CreateRangeEventsOnMarkerScale (strCorridor, , , , , uniMetre, , intNumberOfEvents)
+
+    estSegment = script.Call("subF-EventSetDates", estSegment, "1900-01-01", "3000-01-01", "yyyy-MM-dd")
+
+    estSegment = event.SetAttributeToUniqueId (estSegment, strAttrSegmentID)
+    estSegment = event.Segment (estKilometreSegment, estSegment)
+
+    strAttrSegmentQ = string.Format ("'%s'", strAttrSegment)
+    strAttrSegmentIDQ = string.Format ("'%s'", strAttrSegmentID)
+
+    estSegment = event.FormatAttribute (estSegment, strAttrSegment, "%s segment in %s", strSegmentType, strAttrSegmentQ)
+
+    event.DeleteByCorridor (strSegmentCategoryName, strSegmentType, , , strCorridor)
+    event.Save (estSegment, strSegmentCategoryName, strSegmentType,)
+
+    strSegmentsLayer = string.Append ("Segments")
+    layer.CreateEventLayer (strSegmentsLayer, strSegmentCategoryName, strSegmentType)
+
+  </Commands>
+  <Function logged = "false">
+    <Name>subF-EventSetDates</Name>
+    <Description></Description>
+
+    <Parameter>
+      <Name>estEventsToSetDate</Name>
+      <Type>eventSet</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strStartDate</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strEndDate</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strDateFormat</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Result>
+      <Name>estEventsToSetDate</Name>
+      <Type>eventSet</Type>
+    </Result>
+
+    <Commands>
+
+      strAttrTemp1 = util.Assign ("8fecd2ad-65e2-4f9a-9d99-6dd9a841c9fd")
+      strAttrTemp2 = util.Assign ("ba454bdb-d1d1-4003-a88d-91e723583c7b")
+
+      datStartDate = util.ParseDate (strStartDate, strDateFormat)
+      datEndDate = util.ParseDate (strEndDate, strDateFormat)
+      estEventsToSetDate = event.SetAttribute (estEventsToSetDate, strAttrTemp1, datStartDate)
+      estEventsToSetDate = event.SetAttribute (estEventsToSetDate, strAttrTemp2, datEndDate)
+      estEventsToSetDate = event.SetDatesToAttributes (estEventsToSetDate, strAttrTemp1, strAttrTemp2)
+
+      estEventsToSetDate = event.RemoveAttribute (estEventsToSetDate, strAttrTemp1)
+      estEventsToSetDate = event.RemoveAttribute (estEventsToSetDate, strAttrTemp2)
+
+
+    </Commands>
+  </Function>
+
+
+</Script>

@@ -1,0 +1,123 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Script>
+  <Version>1.0</Version>
+  <Description>Creates ARTC segmentation for a corridor</Description>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter required = "True">
+    <Name>strCorridor</Name>
+    <Type>string</Type>
+    <Source>corridor</Source>
+    <Alias>Corridor</Alias>
+  </Parameter>
+
+  <Commands>
+
+    <!--
+    ##################################################################################################
+    Initialise
+    ##################################################################################################
+    -->
+
+	<!-- Segment event category, types and attributes -->
+
+	strSegmentCategory = string.Append ("Segment")
+	str20mBinType = string.Append ("20m Bin")
+	str50mBinType = string.Append ("50m Bin")
+	strCurveAndTangentType = string.Append ("Curves &amp; Tangents")
+
+	strCurveOrTangentAttrName = string.Append ("Curve or Tangent")
+	strTrackAttrName = string.Append ("Track")
+
+	<!-- Design curve event categories and types -->
+
+	strArcCategory = string.Append ("Design Curve (Arc)")
+	strArcType = string.Append ("Arc")
+
+	strTransitionCategory = string.Append ("Design Curve (Transition)")
+	strTransitionType = string.Append ("Transition")
+
+	<!-- Define units -->
+
+	uniMetre = unit.GetUnit ("Metric", "metre")
+
+    <!--
+    ##################################################################################################
+    Step 1 - Create base event set
+	  a. Create event set covering all tracks on the corridor
+    ##################################################################################################
+    -->
+
+	<!-- Create event set covering all tracks on the corridor -->
+
+	estTracks = event.CreateRangeEventsFromMarkers (strCorridor, , , , , uniMetre, )
+	estTracks = event.SetAttributeToTrackNames (estTracks, strTrackAttrName)
+	estTracks = event.MergeWithinDistance (estTracks, 1.0, uniMetre)
+	estTracks = event.RemoveAllAttributes (estTracks)
+
+    <!--
+    ##################################################################################################
+    Step 2 - Create segment types
+	  a. Create 20m bins, join those less than 2m long with previous bin
+	  b. Create 50m bins, join those less than 5m long with previous bin
+	  c. Create curve and tangent segments:
+           1. Load design curve arcs and transitions for the corridor
+		   2. Combine arcs and transitions into a single event set, representing the curves
+		   3. Calculate tangets by subtracing curves from track events
+		   4. Split tangents into 1km long events
+		   5. Set curve or tangent attribute and combine curves and tangents into a single event set
+    ##################################################################################################
+    -->
+
+	<!-- Create 20m bins -->
+
+	est20mBin = event.CreateUniformLengthRangeEvents (strCorridor, , , , , uniMetre, , 20.0, uniMetre)
+
+	estTrackEnds = event.Subtract (estTracks, est20mBin)
+	est20mBin = event.Add (est20mBin, estTrackEnds)
+<!--    est20mBin = event.JoinShortEvents (est20mBin, 2.0, uniMetre, "Dominant") -->
+	est20mBin = event.Separate (est20mBin)
+
+	<!-- Create 50m bins -->
+
+	est50mBin = event.CreateUniformLengthRangeEvents (strCorridor, , , , , uniMetre, , 50.0, uniMetre)
+
+	estTrackEnds = event.Subtract (estTracks, est50mBin)
+	est50mBin = event.Add (est50mBin, estTrackEnds)
+<!--    est50mBin = event.JoinShortEvents (est50mBin, 5.0, uniMetre, "Dominant") -->
+	est50mBin = event.Separate (est50mBin)
+
+	<!-- Create curve and tangent segments -->
+
+	estArcs = event.LoadByCorridor (strArcCategory, strArcType, , , strCorridor)
+	estTransitions = event.LoadByCorridor (strTransitionCategory, strTransitionType, , , strCorridor)
+
+	estCurves = event.Add (estArcs, estTransitions)
+	estCurves = event.RemoveAllAttributes (estCurves)
+	estCurves = event.MergeWithinDistance (estCurves, 1.0, uniMetre)
+
+	estTangents = event.Subtract (estTracks, estCurves)
+	estTangents = event.Split (estTangents, 1000.0, uniMetre, "EqualLengthSeparate")
+
+	estCurves = event.SetAttribute (estCurves, strCurveOrTangentAttrName, "Curve")
+	estTangents = event.SetAttribute (estTangents, strCurveOrTangentAttrName, "Tangent")
+	estCurvesAndTangents = event.Add (estCurves, estTangents)
+
+    <!--
+    ##################################################################################################
+    Step 3 - Save data
+	  a. Delete any existing segments for the corridor
+	  b. Save the new segments
+    ##################################################################################################
+    -->
+
+	event.DeleteByCorridor (strSegmentCategory, , , strCorridor)
+
+	event.Save (est20mBin, strSegmentCategory, str20mBinType)
+	event.Save (est50mBin, strSegmentCategory, str50mBinType)
+	event.Save (estCurvesAndTangents, strSegmentCategory, strCurveAndTangentType)
+
+  </Commands>
+
+</Script>

@@ -1,0 +1,104 @@
+<?xml version="1.1" encoding="ISO-8859-1"?>
+<Script>
+  <Description>Imports Survey</Description>
+  <Version>1.1</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter required = "true">
+    <Name>strUsername</Name>
+    <Type>string</Type>
+    <Source>user</Source>
+    <Default>DataAdmin</Default>
+    <Alias>User File Owner</Alias>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strDataFile</Name>
+    <Type>string</Type>
+    <Alias>File Name:</Alias>
+    <Source>userFile</Source>
+    <Default>import-data/stream/.*</Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strSuccessFolderName</Name>
+    <Type>string</Type>
+    <Alias>Success Folder Name:</Alias>
+    <Source>userFolder</Source>
+    <Default>processed-data/stream</Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strFailedFolderName</Name>
+    <Type>string</Type>
+    <Alias>Failed Folder Name:</Alias>
+    <Source>userFolder</Source>
+    <Default>failed-data/stream</Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+  </Parameter>
+
+  <Commands>
+
+    <!-- Check for name including wildcards, indicating no matching files found -->
+
+    bolHasWildcards = script.Call ("BPS-F-CheckForWildcards.spf", strDataFile)
+    control.GoToIf ("$bolHasWildcards", "End")
+
+    <!-- Validate filename, filename: TrackCondition_<surveyType>_<runId>.csv, with optional path -->
+
+    strFilename = string.ReplaceRegex (strDataFile, "^.*(\\\\|/)", "")
+    strCheckFilename = string.ReplaceRegex (strFilename, "^TrackCondition_ICW_[0-9]+[.]csv$", "")
+    test.FailIfNotEqual (strCheckFilename, "", "", "Filename is an invalid format")
+
+    <!-- Get survey type from filename -->
+
+    strRawSurveyName = string.ReplaceRegex (strFilename, "^TrackCondition_(.*)[.]csv$", "$1")
+    strSurveyType = string.ReplaceRegex (strRawSurveyName, "_[0-9]+$", "")
+    strSurveyType = string.Replace (strSurveyType, "_", " ")
+
+    <!-- Move import file to success or failed folder, depending on script outcome -->
+
+    script.MoveFileOnCompletion (strUsername, strDataFile, strSuccessFolderName, strFailedFolderName)
+
+    <!-- DLD is ARTC-Survey-<surveyType>.dld -->
+
+    strDLD = string.Append ("ARTC-Survey_", strSurveyType, ".dld")
+
+    <!-- Import the raw survey -->
+
+    survey.Delete (strRawSurveyName)
+    uflDataFile = userfile.GetUserFile (strUsername, strDataFile)
+    iNumImported = survey.ImportFile (uflDataFile, strRawSurveyName, , strSurveyType, strDLD)
+
+    strMessage = string.Format ("Imported %d samples for survey %s", iNumImported, strRawSurveyName)
+    console.ShowValue (strMessage, "")
+
+	<!-- Get the survey recording date and define all survey name variants -->
+
+	datSurvey = survey.GetDate (strRawSurveyName)
+
+    strImportedSurveyName = string.Format ("IMP-%1$s_%2$tY%2$tm%2$td", strRawSurveyName, datSurvey)
+    strProcessedSurveyName = string.Format ("PRO-%1$s_%2$tY%2$tm%2$td", strRawSurveyName, datSurvey)
+    strInvalidSurveyName = string.Format ("BAD-%1$s_%2$tY%2$tm%2$td", strRawSurveyName, datSurvey)
+    strBaselineSurveyName = string.Format ("BAS-%1$s_%2$tY%2$tm%2$td", strRawSurveyName, datSurvey)
+    strAlignedSurveyName = string.Format ("ALN-%1$s_%2$tY%2$tm%2$td", strRawSurveyName, datSurvey)
+
+	<!-- Delete any old versions of the survey -->
+	
+    survey.Delete (strImportedSurveyName)
+    survey.Delete (strProcessedSurveyName)
+    survey.Delete (strInvalidSurveyName)
+    survey.Delete (strBaselineSurveyName)
+    survey.Delete (strAlignedSurveyName)
+
+    <!-- Rename imported raw survey and set security -->
+
+	survey.Rename (strRawSurveyName, strImportedSurveyName)
+    security.GrantSurveyAccess (strImportedSurveyName, "Standard User", "R")
+    security.GrantSurveyAccess (strImportedSurveyName, "Power User", "RWD")
+
+  </Commands>
+
+</Script>

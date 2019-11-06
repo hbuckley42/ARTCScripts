@@ -1,0 +1,51 @@
+﻿<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Script>
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+  <Description>Creates Rail Type from Grinding Work</Description>
+
+  <Parameter required = "true">
+    <Name>strCorridor</Name>
+    <Type>string</Type>
+    <Source>corridor</Source>
+    <Alias>Line:</Alias>
+    <Default>10003</Default>
+  </Parameter>
+
+  <Commands>
+
+    strGrindingWorkCategory = util.Assign ("Grinding Work")
+    strGrindingWorkType = util.Assign ("Grinding Work")
+
+    strAttrRailType = util.Assign ("Rail Type")
+    strAttrRailSize = util.Assign ("Rail Size")
+    strAttrLabel  = util.Assign ("Label")
+    strAttrGrindingDate   = util.Assign ("Grinding Date")
+    lstAttributes = collection.ListCreate (strAttrRailType, strAttrRailSize)
+
+    strRailTypeCategory = util.Assign ("Rail Type")
+    strRailTypeType = util.Assign ("Rail Type")
+    uniMetre = unit.GetUnit ("Metric", "metre")
+
+
+    estGrinding = event.LoadByCorridor (strGrindingWorkCategory, strGrindingWorkType, , , strCorridor)
+    estGrinding = event.RetainAttributes (estGrinding, lstAttributes)
+    estGrinding = event.SetAttributeToStartDate (estGrinding, strAttrGrindingDate)
+    estGrinding = event.Stack (estGrinding, strAttrGrindingDate, "Maximum")
+    estGrinding = event.MergeWithinDistance (estGrinding, 1, uniMetre)
+
+    <!--    estRailType  = event.FormatAttribute (estGrinding, strAttrLabel, "'%s'/'%s'", strAttrRailType, strAttrRailSize) -->
+
+    forLabel = formula.Create("string", "append('Rail Type'," ",'Rail Size')")
+    estRailType = event.CalculateAttribute(estGrinding, forLabel, strAttrLabel, "string")
+
+
+    event.DeleteByCorridor (strRailTypeCategory, strRailTypeType, , , strCorridor)
+    event.Save (estRailType, strRailTypeCategory, strRailTypeType)
+
+    strRailTypeLayerName = util.Assign ("Rail Types")
+    layer.CreateEventLayer (strRailTypeLayerName, strRailTypeCategory, strRailTypeType)
+
+  </Commands>
+</Script>

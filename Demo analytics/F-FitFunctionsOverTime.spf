@@ -1,0 +1,77 @@
+<?xml version = "1.0" encoding = "ISO-8859-1" ?>
+
+<Function logged = "false">
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Description>
+    F-FitFunctionsOverTime is a concrete implementation of event.FitFunctionsOverTime command.
+    This function:
+    a) Groups the input event set according to the given masking event set and "FullyOverlapped"
+    option, i.e. an event is only added to one of the groups if it fully overlaps an event
+    from the mask event set specified as estMaskForGrouping
+    b) For each numeric attribute from the list of ordinate attributes, specified as lstOrdinateAttributes,
+    performs a least-squares fit of a function given as strFunction (e.g. linear, polynomial, logarithmic)
+    through points defined by the event date and this numeric attribute (one function per ordinate attribute
+    and an event from the mask event set)
+    c)Returns a map of the ordinate attributes mapped to the related computed fit functions over time
+
+    **** Parameters ****
+    - estToComputeFitFunction - An event set to be used to compute fit functions over time. Each vent must
+    contain all attributes from the ordinate list lstOrdinateAttributes.
+
+    - estMaskForGrouping - The mask event set to use for the grouping the estToComputeFitFunction
+    events by their location. This should not may be empty.
+
+    - lstOrdinateAttributes - Names of the numeric attributes holding ordinate values give as a list.
+
+    - strFunction - The name of the function form to be fitted though the data points
+    (see event.FitFunctionsOverTime command for more details)
+
+  </Description>
+
+  <Parameter>
+    <Name>estToComputeFitFunction</Name>
+    <Type>eventSet</Type>
+  </Parameter>
+
+  <Parameter>
+    <Name>estMaskForGrouping</Name>
+    <Type>eventSet</Type>
+  </Parameter>
+
+  <Parameter>
+    <Name>lstOrdinateAttrNames</Name>
+    <Type>list</Type>
+  </Parameter>
+
+  <Parameter>
+    <Name>strFunction</Name>
+    <Default>Linear</Default>
+    <Type>string</Type>
+  </Parameter>
+
+  <Result>
+    <Name>mapFitFunctions</Name>
+    <Type>map</Type>
+  </Result>
+
+  <Commands>
+    lstGroup = event.Group (estMaskForGrouping, estToComputeFitFunction, "FullyOverlapped")
+
+    mapFitFunctions = collection.MapCreate ()
+    intNumberAttributesToTrend = collection.Size(lstOrdinateAttrNames)
+    intIndex = util.Assign(0)
+    forNextIndex = formula.Create("$intIndex + 1")
+
+    loopBegin:
+    control.GoToIf("$intIndex == $intNumberAttributesToTrend", "loopEnd")
+    strOrdinateAttribute = collection.ListGet(lstOrdinateAttrNames, intIndex)
+    lstFitFunctions = event.FitFunctionsOverTime (lstGroup, strFunction, strOrdinateAttribute)
+    collection.MapPut (mapFitFunctions, strOrdinateAttribute, lstFitFunctions)
+    intIndex = formula.Evaluate(forNextIndex, , "integer")
+    control.GoTo("loopBegin")
+    loopEnd:
+
+  </Commands>
+</Function>

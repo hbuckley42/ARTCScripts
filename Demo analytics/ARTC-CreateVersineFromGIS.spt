@@ -1,0 +1,78 @@
+<?xml version = "1.0" encoding = "ISO-8859-1" ?>
+
+<Script>
+  <Description>Create versine from track</Description>
+  <Version>1.1</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter>
+    <Name>strCorridor</Name>
+    <Type>string</Type>
+    <Source>corridor</Source>
+    <Alias>Line:</Alias>
+  </Parameter>
+
+  <Commands>
+
+    <!--
+    ##################################################################################################
+    Input:
+
+      Corridor:         Corridor name (as parameter)
+
+    Output:
+
+      Survey Name:      Versine from GIS - with corridor name prefix
+      Survey Type:      GIS Versine
+      Channels:         Versine from GIS
+
+    ##################################################################################################
+    -->
+
+    <!--
+    ##################################################################################################
+    Initialise
+    ##################################################################################################
+    -->
+
+    strOutputSurvey = string.Append ("Versine from GIS - ", strCorridor)
+    strVersineChannelName = string.Append ("Versine from GIS")
+    strVersineSurveyType = string.Append ("GIS-Versine")
+
+    <!-- Unit defintions -->
+
+    uniMetres = unit.GetUnit("Metric", "metre")
+
+    <!--
+    ##################################################################################################
+    Processing Step 1 - Create Versine
+      a. Create events from all mainline tracks on the corridor
+      b. Merge and convert to stream and create traversals
+      c. Create versine from the traversal
+      d. Resample to a foot, compute swept mean, then multiply by 16 to convert to curvature value
+    ##################################################################################################
+    -->
+
+    estTracks = event.CreateRangeEventsFromMarkers (strCorridor, , , , , uniMetres, )
+    estTracks = event.MergeWithinDistance (estTracks, 1.0, uniMetres)
+    estTracks = event.Separate (estTracks)
+    estTracks = event.SetAttribute (estTracks, "Value", 1.0)
+
+    srmVersine = event.ToStream (estTracks, "Value", 10.0, uniMetres)
+    trvVersine = stream.ToTraversals (srmVersine)
+
+    srmVersine = stream.CreateVersineFromGIS(trvVersine, 100.0, 20.0, 2.0, 30, uniMetres)
+    srmVersine = stream.Math (srmVersine, "*", 250.0)
+
+    <!--
+    ###################################################################################################################
+    Delete original survey and save versine to new stream
+    ###################################################################################################################
+    -->
+
+    survey.Delete (strOutputSurvey)
+    srmVersine = stream.Trim(srmVersine,estTracks)
+    stream.Save (srmVersine, strOutputSurvey, strVersineChannelName, strVersineSurveyType )
+
+  </Commands>
+</Script>

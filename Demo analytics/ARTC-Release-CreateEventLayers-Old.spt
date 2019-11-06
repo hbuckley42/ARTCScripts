@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Script>
+  <Description>Create track geometry limit events</Description>
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Commands>
+
+    <!--
+    ##################################################################################################
+    Initialise
+    ##################################################################################################
+    -->
+
+	<!-- Limits events category, types and layers -->
+
+	strTGLimitCategory = string.Append ("TG Limit")
+
+	strGaugeTightLimitType = string.Append ("Gauge - Tight")
+	strGaugeWideLimitType = string.Append ("Gauge - Wide")
+	strHAlignLimitType = string.Append ("Horizontal Alignment")
+	strTopLimitType = string.Append ("Top")
+	strTwistLimitType = string.Append ("Twist")
+
+	strTGLimitE1Layer = string.Append ("TG E1 Limits")
+	strTGLimitE2Layer = string.Append ("TG E2 Limits")
+	strTGLimitP1Layer = string.Append ("TG P1 Limits")
+	strTGLimitP2Layer = string.Append ("TG P2 Limits")
+
+    <!--
+    ##################################################################################################
+    Define layers to view the limits - one layer for each limit and one sub-layer for each limit type
+    ##################################################################################################
+    -->
+
+	layer.Delete (strTGLimitE1Layer)
+	layer.Delete (strTGLimitE2Layer)
+	layer.Delete (strTGLimitP1Layer)
+	layer.Delete (strTGLimitP2Layer)
+	
+	<!-- E1 Limits -->
+
+	layer.CreateEventLayer (strTGLimitE1Layer, strTGLimitCategory, strGaugeTightLimitType)
+	layer.CreateEventLayer (strTGLimitE1Layer, strTGLimitCategory, strGaugeWideLimitType)
+	layer.CreateEventLayer (strTGLimitE1Layer, strTGLimitCategory, strHAlignLimitType)
+	layer.CreateEventLayer (strTGLimitE1Layer, strTGLimitCategory, strTopLimitType)
+	layer.CreateEventLayer (strTGLimitE1Layer, strTGLimitCategory, strTwistLimitType)
+
+	layer.SetSubLayerColor (strTGLimitE1Layer, strGaugeTightLimitType, "Black")
+	layer.SetSubLayerColor (strTGLimitE1Layer, strGaugeWideLimitType, "Black")
+	layer.SetSubLayerColor (strTGLimitE1Layer, strHAlignLimitType, "Black")
+	layer.SetSubLayerColor (strTGLimitE1Layer, strTopLimitType, "Black")
+	layer.SetSubLayerColor (strTGLimitE1Layer, strTwistLimitType, "Black")
+
+	<!-- E2 Limits -->
+
+	layer.CreateEventLayer (strTGLimitE2Layer, strTGLimitCategory, strGaugeTightLimitType)
+	layer.CreateEventLayer (strTGLimitE2Layer, strTGLimitCategory, strGaugeWideLimitType)
+	layer.CreateEventLayer (strTGLimitE2Layer, strTGLimitCategory, strHAlignLimitType)
+	layer.CreateEventLayer (strTGLimitE2Layer, strTGLimitCategory, strTopLimitType)
+	layer.CreateEventLayer (strTGLimitE2Layer, strTGLimitCategory, strTwistLimitType)
+
+	layer.SetSubLayerColor (strTGLimitE2Layer, strGaugeTightLimitType, "Red")
+	layer.SetSubLayerColor (strTGLimitE2Layer, strGaugeWideLimitType, "Red")
+	layer.SetSubLayerColor (strTGLimitE2Layer, strHAlignLimitType, "Red")
+	layer.SetSubLayerColor (strTGLimitE2Layer, strTopLimitType, "Red")
+	layer.SetSubLayerColor (strTGLimitE2Layer, strTwistLimitType, "Red")
+
+	<!-- P1 Limits -->
+
+	layer.CreateEventLayer (strTGLimitP1Layer, strTGLimitCategory, strGaugeTightLimitType)
+	layer.CreateEventLayer (strTGLimitP1Layer, strTGLimitCategory, strGaugeWideLimitType)
+	layer.CreateEventLayer (strTGLimitP1Layer, strTGLimitCategory, strHAlignLimitType)
+	layer.CreateEventLayer (strTGLimitP1Layer, strTGLimitCategory, strTopLimitType)
+	layer.CreateEventLayer (strTGLimitP1Layer, strTGLimitCategory, strTwistLimitType)
+
+	layer.SetSubLayerColor (strTGLimitP1Layer, strGaugeTightLimitType, "Orange")
+	layer.SetSubLayerColor (strTGLimitP1Layer, strGaugeWideLimitType, "Orange")
+	layer.SetSubLayerColor (strTGLimitP1Layer, strHAlignLimitType, "Orange")
+	layer.SetSubLayerColor (strTGLimitP1Layer, strTopLimitType, "Orange")
+	layer.SetSubLayerColor (strTGLimitP1Layer, strTwistLimitType, "Orange")
+
+	<!-- P2 Limits -->
+
+	layer.CreateEventLayer (strTGLimitP2Layer, strTGLimitCategory, strGaugeTightLimitType)
+	layer.CreateEventLayer (strTGLimitP2Layer, strTGLimitCategory, strGaugeWideLimitType)
+	layer.CreateEventLayer (strTGLimitP2Layer, strTGLimitCategory, strHAlignLimitType)
+	layer.CreateEventLayer (strTGLimitP2Layer, strTGLimitCategory, strTopLimitType)
+	layer.CreateEventLayer (strTGLimitP2Layer, strTGLimitCategory, strTwistLimitType)
+
+	layer.SetSubLayerColor (strTGLimitP2Layer, strGaugeTightLimitType, "Yellow")
+	layer.SetSubLayerColor (strTGLimitP2Layer, strGaugeWideLimitType, "Yellow")
+	layer.SetSubLayerColor (strTGLimitP2Layer, strHAlignLimitType, "Yellow")
+	layer.SetSubLayerColor (strTGLimitP2Layer, strTopLimitType, "Yellow")
+	layer.SetSubLayerColor (strTGLimitP2Layer, strTwistLimitType, "Yellow")
+
+  </Commands>
+
+</Script>
+
+
+

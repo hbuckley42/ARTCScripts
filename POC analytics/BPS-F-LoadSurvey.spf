@@ -1,0 +1,58 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Function logged = "false">
+  <Version>1.0</Version>
+  <Description>Loads required channels from a survey</Description>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter required = "true">
+    <Name>strSurvey</Name>
+    <Type>string</Type>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>lisChannelNames</Name>
+    <Type>list</Type>
+  </Parameter>
+
+  <Result>
+    <Name>mapChannels</Name>
+    <Type>map</Type>
+  </Result>
+
+  <Commands>
+
+    <!--
+    ##################################################################################################
+
+    Parameters:
+      strSurvey:        Name of survey to load data from
+      lisChannelNames:  List of channels to load
+
+    Result:
+      map:              Map of channel data, one entry for each channel in supplied list, name is channel
+                        name, value is channel. Will be empty if an empty list of channel names supplied.
+
+    ##################################################################################################
+    -->
+
+    forIndexDecrement = formula.Create ("$intIndex - 1")
+
+    <!-- Initialise map of channels, exit if no channels to load -->
+
+    mapChannels = collection.MapCreate ()
+    test.ExitIfNullOrEmpty (lisChannelNames, "", "")
+
+    <!-- Loop through the list of channels loading each one -->
+
+    intIndex = collection.Size (lisChannelNames)
+    BeginLoop:
+        intIndex = formula.Evaluate (forIndexDecrement, , "integer")
+        strChannelName = collection.ListGet (lisChannelNames, intIndex)
+        srmChannel = stream.Load (strSurvey, strChannelName)
+        collection.MapPut (mapChannels, strChannelName, srmChannel)
+        control.GoToIf ("$intIndex > 0", "BeginLoop")
+
+  </Commands>
+ 
+ </Function>

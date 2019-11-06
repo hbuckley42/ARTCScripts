@@ -1,0 +1,141 @@
+<?xml version = "1.0" encoding = "ISO-8859-1" ?>
+
+<Script>
+  <Description>Imports Design Curve for a corridor</Description>
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter required = "true">
+    <Name>strUsername</Name>
+    <Type>string</Type>
+    <Source>user</Source>
+    <Default>DataAdmin</Default>
+    <Alias>User File Owner</Alias>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strDataFile</Name>
+    <Type>string</Type>
+    <Alias>File Name:</Alias>
+    <Source>userFile</Source>
+    <Default>import-data/event/.*Design_Curve.*</Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strSuccessFolderName</Name>
+    <Type>string</Type>
+    <Alias>Success Folder Name:</Alias>
+    <Source>userFolder</Source>
+    <Default>processed-data/event</Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strFailedFolderName</Name>
+    <Type>string</Type>
+    <Alias>Failed Folder Name:</Alias>
+    <Source>userFolder</Source>
+    <Default>failed-data/event</Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+  </Parameter>
+
+  <Commands>
+
+    script.SetLogLevel ("info")
+
+    <!--
+    ##################################################################################################
+
+    Output:
+      Design Curve: Design Curve
+
+      Extent Category:  Design Curve (Arc)
+      Event Type:       Arc
+      Event Attributes: Basecode
+	                    Curve Name
+                        Radius
+                        
+      Extent Category:  Design Curve (Transition)
+      Event Types:      Transition
+      Event Attributes: Basecode
+	                    Curve Name
+
+    ##################################################################################################
+	-->
+
+	strDesignCurveType = string.Append ("Design Curve")
+	strArcCategory = string.Append ("Design Curve (Arc)")
+	strTransitionCategory = string.Append ("Design Curve (Transition)")
+	
+	strArcType = string.Append ("Arc")
+	strTransitionType = string.Append ("Transition")
+
+    <!-- Define DLDs -->
+
+    strDesignCurveDLD = string.Append ("ARTC-Design Curve.dld")
+    strDesignCurveArcDLD = string.Append ("ARTC-Event_Design Curve (Arc).dld")
+    strDesignCurveTransitionDLD = string.Append ("ARTC-Event_Design Curve (Transition).dld")
+
+    <!-- Check for name including wildcards, indicating no matching files found -->
+
+    bolHasWildcards = script.Call ("BPS-F-CheckForWildcards.spf", strDataFile)
+    control.GoToIf ("$bolHasWildcards", "End")
+
+    <!-- Validate filename, filename: <corridor>_Design_Curve_<yyyymmdd>.csv, with optional path -->
+
+    strFilename = string.ReplaceRegex (strDataFile, "^.*(\\\\|/)", "")
+    strCheckFilename = string.ReplaceRegex (strFilename, "^[A-Z][0-9]+_Design_Curve_[0-9]{8}[.]csv$", "")
+    test.FailIfNotEqual (strCheckFilename, "", "", "Filename is an invalid format")
+
+    <!-- Get corridor name and asset type (which will be Design Curve) from filename -->
+
+    strCorridor = string.ReplaceRegex (strFilename, "_.*$", "")
+    strAssetType = string.ReplaceRegex (strFilename, "^[A-Z][0-9]+_(.+)_[0-9]{8}[.]csv$", "$1")
+    strAssetType = string.ReplaceRegex (strAssetType, "_", " ")
+
+    <!-- Move import file to success or failed folder, depending on script outcome -->
+
+    script.MoveFileOnCompletion (strUsername, strDataFile, strSuccessFolderName, strFailedFolderName)
+
+    <!-- Delete any existing design curve on the corridor and import the new assets -->
+
+    asset.Delete (strDesignCurveType, strCorridor)
+
+    uflDataFile = userfile.GetUserFile (strUsername, strDataFile)
+    iNumImported = asset.ImportCurvesFile (uflDataFile, strDesignCurveDLD)
+
+    strMessage = string.Format ("Imported %d design curve elements for corridor %s", iNumImported, strCorridor)
+    console.ShowValue (strMessage, "")
+
+	<!-- Delete any existing design curve events and import the design curve as events -->
+
+	event.DeleteByCorridor (strArcCategory, strArcType, , , strCorridor)
+    iNumImported = event.ImportFile (uflDataFile, , strDesignCurveArcDLD)
+
+	event.DeleteByCorridor (strTransitionCategory, strTransitionType, , , strCorridor)
+    iNumImported = event.ImportFile (uflDataFile, , strDesignCurveTransitionDLD)
+
+	<!-- Combine all transitions with the same curve name to create events for full coverage of curve -->
+
+	estArcs = event.LoadByCorridor (strArcCategory, strArcType, , , strCorridor)
+	estTransitions = event.LoadByCorridor (strTransitionCategory, strTransitionType, , , strCorridor)
+
+	lisAttrsToRetain = collection.ListCreate ("Basecode", "Curve Name")
+	estTransitions = event.RetainAttributes (estTransitions, lisAttrsToRetain)
+
+	uniMetre = unit.GetUnit ("Metric", "metre")
+	estTransitions = event.MergeWithinDistance (estTransitions, 5000.0, uniMetre)
+
+	<!-- Remove any design curve arcs from the transitions to just leave the transitions -->
+
+    estTransitions = event.Subtract (estTransitions, estArcs)
+	estTransitions = event.Separate (estTransitions)
+
+	<!-- Delete the loaded design curve transitions and save the updated ones -->
+
+	event.DeleteByCorridor (strTransitionCategory, strTransitionType, , , strCorridor)
+	event.Save (estTransitions, strTransitionCategory, strTransitionType)
+
+  </Commands>
+</Script>

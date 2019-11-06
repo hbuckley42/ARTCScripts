@@ -1,0 +1,78 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Function logged = "false">
+  <Version>1.0</Version>
+  <Description>Aligns channels from a survey</Description>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter required = "true">
+    <Name>mapChannels</Name>
+    <Type>map</Type>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>lisChannelsToUpdate</Name>
+    <Type>list</Type>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>dblOriginalValue</Name>
+    <Type>double</Type>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>intWindow</Name>
+    <Type>integer</Type>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>dblNewValue</Name>
+    <Type>double</Type>
+  </Parameter>
+
+  <Result>
+    <Name>mapUpdatedChannels</Name>
+    <Type>map</Type>
+  </Result>
+
+  <Commands>
+
+    <!--
+    ##################################################################################################
+
+    Parameters:
+      mapChannels:          Map of channels
+      lisChannelsToUpdate:  List of channels within map to be updated
+      dblOriginalValue:     Sample value to be replaced
+      intWindow:            Minimum number of consecutive samples that must match original value
+      dblNewValue:          New sample value
+
+    Result:
+      map:              Original map of channels, with values replaced in specified channels.
+                        Will be empty if an empty map of channels supplied.
+
+    ##################################################################################################
+    -->
+
+    forIndexDecrement = formula.Create ("$intIndex - 1")
+
+    <!-- Initialise map of aligned channels, exit if no channels to update -->
+
+    mapUpdatedChannels = util.Assign (mapChannels)
+    test.ExitIfNullOrEmpty (mapChannels, "", "")
+    test.ExitIfNullOrEmpty (lisChannelsToUpdate, "", "")
+
+    <!-- Loop through the list of channels updating each channel in turn -->
+
+    intIndex = collection.Size (lisChannelsToUpdate)
+    BeginLoop:
+        intIndex = formula.Evaluate (forIndexDecrement, , "integer")
+        strChannelName = collection.ListGet (lisChannelsToUpdate, intIndex)
+        srmChannel = collection.MapGet (mapChannels, strChannelName)
+        srmUpdatedChannel = stream.ReplaceValues (srmChannel, dblOriginalValue, intWindow, dblNewValue)
+        collection.MapPut (mapUpdatedChannels, strChannelName, srmUpdatedChannel)
+        control.GoToIf ("$intIndex > 0", "BeginLoop")
+
+  </Commands>
+
+</Function>

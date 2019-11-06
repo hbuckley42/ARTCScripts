@@ -1,0 +1,86 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Function logged = "false">
+  <Description>Locate assets on a track for a corridor</Description>
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter required = "true">
+    <Name>strCorridor</Name>
+    <Type>string</Type>
+    <Source>corridor</Source>
+    <Alias>Corridor</Alias>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strAssetType</Name>
+    <Type>string</Type>
+    <Alias>Asset Type</Alias>
+    <Source>choice</Source>
+    <Choice>Culvert</Choice>
+    <Choice>Joint</Choice>
+    <Choice>Level Crossing</Choice>
+    <Choice>Overbridge</Choice>
+    <Choice>Signal</Choice>
+    <Choice>Tunnel</Choice>
+    <Choice>Turnout</Choice>
+    <Choice>Underbridge</Choice>
+  </Parameter>
+
+  <Commands>
+
+    <!-- Set asset offsets, use different variants depending on the asset type -->
+
+    control.GoToIf ("$strAssetType == \"Culvert\"", "Culvert",
+                    "$strAssetType == \"Joint\"", "Joint",
+                    "$strAssetType == \"Level Crossing\"", "LevelCrossing",
+                    "$strAssetType == \"Overbridge\"", "Overbridge",
+                    "$strAssetType == \"Signal\"", "Signal",
+                    "$strAssetType == \"Tunnel\"", "Tunnel",
+                    "$strAssetType == \"Turnout\"", "Turnout",
+                    "$strAssetType == \"Underbridge\"", "Underbridge") 
+
+        strMessage = string.Format ("Unsupported asset type: %s", strAssetType)
+        test.FailIfEqual ("Always Fails", "Always Fails", "", strMessage)
+        control.GoTo ("EndIfAssetType")
+
+    Culvert:
+        lisSubAssetTypes = collection.ListCreate ("Culvert - Small", "Culvert - Large", "Culvert - Unknown Size")
+        corridor.SetAssetsOffsetsFromAttributedTrack (strCorridor, lisSubAssetTypes, "STRAIGHTENED", , "Basecode")
+        control.GoTo ("EndIfAssetType")
+
+    Joint:
+        lisSubAssetTypes = collection.ListCreate ("Joint - AC", "Joint - GD", "Joint - GD/AC")
+        corridor.SetAssetsOffsetsFromAttributedTrack (strCorridor, lisSubAssetTypes, "STRAIGHTENED", 200, "Basecode", , , false, , "Drawn Side")
+        control.GoTo ("EndIfAssetType")
+
+    LevelCrossing:
+        lisSubAssetTypes = collection.ListCreate ("Level Crossing - Private", "Level Crossing - Public")
+        corridor.SetAssetsOffsetsFromAttributedTrack (strCorridor, lisSubAssetTypes, "STRAIGHTENED", , "Basecode")
+        control.GoTo ("EndIfAssetType")
+ 
+    Overbridge:
+        corridor.SetAssetOffsetsFromAttributedTrack (strCorridor, "Overbridge", "STRAIGHTENED", , "Basecode")
+        control.GoTo ("EndIfAssetType")
+ 
+    Signal:
+        corridor.SetAssetOffsetsFromAttributedTrack (strCorridor, "Signal", "STRAIGHTENED", 350, "Basecode", , , false, , "Drawn Side")
+        control.GoTo ("EndIfAssetType")
+ 
+    Tunnel:
+        corridor.SetAssetOffsetsFromAttributedTrack (strCorridor, "Tunnel", "STRAIGHTENED", , "Basecode")
+        control.GoTo ("EndIfAssetType")
+
+    Turnout:
+        corridor.SetAssetOffsetsFromAttributedTrack (strCorridor, "Turnout", "STRAIGHTENED", , "Basecode Through")
+        control.GoTo ("EndIfAssetType")
+
+    Underbridge:
+        corridor.SetAssetOffsetsFromAttributedTrack (strCorridor, "Underbridge", "STRAIGHTENED", , "Basecode")
+        control.GoTo ("EndIfAssetType")
+
+    EndIfAssetType:
+
+  </Commands>
+
+</Function>

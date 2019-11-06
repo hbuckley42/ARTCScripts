@@ -1,0 +1,200 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Script>
+  <Version>1.0</Version>
+  <Description>Creates TMS above threshold for a survey</Description>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter required = "True">
+    <Name>strSurvey</Name>
+    <Type>string</Type>
+    <Source>survey</Source>
+    <Alias>Survey</Alias>
+    <Default>^ALN-AK_Combined.*</Default>
+  </Parameter>
+
+  <Commands>
+
+    <!-- Check for name including wildcards, indicating no matching files found -->
+
+    bolHasWildcards = script.Call ("BPS-F-CheckForWildcards.spf", strSurvey)
+    control.GoToIf ("$bolHasWildcards", "End")
+
+    <!-- Check survey is an imported or processed AK survey -->
+
+    test.FailIfNotMatch (strSurvey, "^ALN-AK_Combined_[0-9]+_[0-9]{8}$", "", "Survey must be an aligned AK survey.")
+
+    <!--
+    ##################################################################################################
+    Initialise
+    ##################################################################################################
+    -->
+
+	<!-- Segment event category, types and attributes -->
+
+	strSegmentCategory = string.Append ("Segment")
+	strCurveAndTangentType = string.Append ("Curves &amp; Tangents")
+
+	<!-- TMS percentage above threshold event category, types and attributes-->
+
+	strTMSCategory = string.Append ("TMS Above Threshold")
+	strTMSLeftType = string.Append ("Left")
+	strTMSRightType = string.Append ("Right")
+
+	strEndDateAttrName = string.Append ("End Date")
+	strDisplayPctAbove300AttrName = string.Append ("% above 300 (Rounded)")
+	strDisplayPctAbove500AttrName = string.Append ("% above 500 (Rounded)")
+	strDisplayPctAbove700AttrName = string.Append ("% above 700 (Rounded)")
+	strPctAbove300AttrName = string.Append ("% above 300")
+	strPctAbove500AttrName = string.Append ("% above 500")
+	strPctAbove700AttrName = string.Append ("% above 700")
+	strRailAttrName = string.Append ("Rail")
+	strSurveyDateAttrName = string.Append ("Survey Date")
+	strSurveyNameAttrName = string.Append ("Survey Name")
+
+	strPctAbove300AttrNameAsArgument = string.Append ("'", strPctAbove300AttrName, "'")
+	strPctAbove500AttrNameAsArgument = string.Append ("'", strPctAbove500AttrName, "'")
+	strPctAbove700AttrNameAsArgument = string.Append ("'", strPctAbove700AttrName, "'")
+
+	<!-- TMS channels -->
+
+	strTMSLeftChannel = string.Append ("Calculated TMS Left")
+	strTMSRightChannel = string.Append ("Calculated TMS Right")
+
+	<!-- Define units -->
+
+	uniMetre = unit.GetUnit ("Metric", "metre")
+
+	<!-- Define limits -->
+
+	limLE300 = limit.Create ("300", 300.0, uniMetre, "le")
+	lisLimLE300 = collection.ListCreate (limLE300)
+
+	limLE500 = limit.Create ("500", 500.0, uniMetre, "le")
+	lisLimLE500 = collection.ListCreate (limLE500)
+
+	limLE700 = limit.Create ("700", 700.0, uniMetre, "le")
+	lisLimLE700 = collection.ListCreate (limLE700)
+
+	<!-- Formula to add 4 months to start date -->
+
+	strForAdd4Months = string.Append ("AddMonths('", strSurveyDateAttrName, "',4)") 
+	forAdd4Months = formula.Create (strForAdd4Months)
+
+    <!--
+    ##################################################################################################
+    Step 1 - Load
+	  a. Load TMS channels
+	  b. Load segmentation covering the survey
+    ##################################################################################################
+    -->
+
+	srmTMSLeft = stream.Load (strSurvey, strTMSLeftChannel)
+	srmTMSRight = stream.Load (strSurvey, strTMSRightChannel)
+
+    trvSurvey = stream.ToTraversals (srmTMSLeft)
+	estSegments = event.LoadByTraversal (strSegmentCategory, strCurveAndTangentType, , , trvSurvey)
+
+    <!--
+    ##################################################################################################
+    Step 2 - 
+	  a. 
+    ##################################################################################################
+    -->
+
+	<!-- Calculate TMS Left above thresholds -->
+
+	estTMSLeftAboveThreshold = script.Call ("subF-ThresholdAndCalculatePercentCovered", srmTMSLeft, lisLimLE300, strPctAbove300AttrName, estSegments)
+	estTMSLeftAboveThreshold = script.Call ("subF-ThresholdAndCalculatePercentCovered", srmTMSLeft, lisLimLE500, strPctAbove500AttrName, estTMSLeftAboveThreshold)
+	estTMSLeftAboveThreshold = script.Call ("subF-ThresholdAndCalculatePercentCovered", srmTMSLeft, lisLimLE700, strPctAbove700AttrName, estTMSLeftAboveThreshold)
+	estTMSLeftAboveThreshold = event.SetAttribute (estTMSLeftAboveThreshold, strRailAttrName, "Left")
+
+	<!-- Calculate TMS Right above thresholds -->
+
+	estTMSRightAboveThreshold = script.Call ("subF-ThresholdAndCalculatePercentCovered", srmTMSRight, lisLimLE300, strPctAbove300AttrName, estSegments)
+	estTMSRightAboveThreshold = script.Call ("subF-ThresholdAndCalculatePercentCovered", srmTMSRight, lisLimLE500, strPctAbove500AttrName, estTMSRightAboveThreshold)
+	estTMSRightAboveThreshold = script.Call ("subF-ThresholdAndCalculatePercentCovered", srmTMSRight, lisLimLE700, strPctAbove700AttrName, estTMSRightAboveThreshold)
+	estTMSRightAboveThreshold = event.SetAttribute (estTMSRightAboveThreshold, strRailAttrName, "Right")
+
+	<!-- Format above threshold values to 2 deciaml places for display -->
+
+	estTMSAboveThreshold = event.Add (estTMSLeftAboveThreshold, estTMSRightAboveThreshold)
+	estTMSAboveThreshold = event.FormatAttribute (estTMSAboveThreshold, strDisplayPctAbove300AttrName, "%.2f", strPctAbove300AttrNameAsArgument)
+	estTMSAboveThreshold = event.FormatAttribute (estTMSAboveThreshold, strDisplayPctAbove500AttrName, "%.2f", strPctAbove500AttrNameAsArgument)
+	estTMSAboveThreshold = event.FormatAttribute (estTMSAboveThreshold, strDisplayPctAbove700AttrName, "%.2f", strPctAbove700AttrNameAsArgument)
+
+	<!-- Calculate start and end dates from survey date -->
+
+	datSurvey = survey.GetDate (strSurvey)
+	estTMSAboveThreshold = event.SetAttribute (estTMSAboveThreshold, strSurveyNameAttrName, strSurvey)
+	estTMSAboveThreshold = event.SetAttribute (estTMSAboveThreshold, strSurveyDateAttrName, datSurvey)
+	estTMSAboveThreshold = event.CalculateAttribute (estTMSAboveThreshold, forAdd4Months, strEndDateAttrName, "date")
+	estTMSAboveThreshold = event.SetDatesToAttributes (estTMSAboveThreshold, strSurveyDateAttrName, strEndDateAttrName)
+	estTMSAboveThreshold = event.RemoveAttribute (estTMSAboveThreshold, strEndDateAttrName)
+
+    <!--
+    ##################################################################################################
+    Step 3 - Save data
+	  a. Delete any existing segments for this survey
+	  b. Save the new segments
+    ##################################################################################################
+    -->
+
+	event.DeleteByAttribute (strTMSCategory, , strSurveyNameAttrName, strSurvey)
+	event.Save (estTMSAboveThreshold, strTMSCategory, , strRailAttrName)
+
+  </Commands>
+
+<Function logged = "false">
+  <Name>subF-ThresholdAndCalculatePercentCovered</Name>
+
+  <Parameter required = "true">
+    <Name>srmInput</Name>
+    <Type>stream</Type>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>lisLimits</Name>
+    <Type>list</Type>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strAttrName</Name>
+    <Type>string</Type>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>estCoverage</Name>
+    <Type>eventSet</Type>
+  </Parameter>
+
+  <Result>
+    <Name>estCoverage</Name>
+    <Type>eventSet</Type>
+  </Result>
+
+  <Commands>
+
+	uniMetre = unit.GetUnit ("Metric", "metre")
+
+	<!-- Formulas -->
+	
+	forPercentCovered = formula.Create ("'Covered Length' == null", "0.0", "100.0 * 'Covered Length'/'Length'")
+
+	estCoverage = event.SetAttributeToLength (estCoverage, "Length", uniMetre)
+
+
+	estAboveLimit = stream.Threshold (srmInput, lisLimits, "Limit Name", "Limit Value")
+	estAboveLimit = event.SetAttributeToLength (estAboveLimit, "Length", uniMetre)
+
+	estCoverage = event.Aggregate (estCoverage, estAboveLimit, "Length", "Covered Length", "ProratedSum")
+	estCoverage = event.CalculateAttribute (estCoverage, forPercentCovered, strAttrName, "double")
+	
+	estCoverage = event.RemoveAttribute (estCoverage, "Length")
+	estCoverage = event.RemoveAttribute (estCoverage, "Covered Length")
+
+  </Commands>
+
+</Function>
+
+</Script>

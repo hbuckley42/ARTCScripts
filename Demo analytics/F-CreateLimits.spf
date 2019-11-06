@@ -1,0 +1,69 @@
+<?xml version = "1.0" encoding = "utf-8" ?>
+
+<Function logged = "false">
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+  <Description>
+    F-CreateLimits is a concrete implementation of limit.Create command.
+    It creates a list of limits from the given list of numeric or date values
+    and the list of corresponding limit names. The number of the limit values
+    and limit names must be the same.
+    Returns a list of limits.
+
+    *** Parameters ***
+    - lstLimitValues - The list of limit values. This may be a numeric or date.
+    - lstLimitNames - The list of limit names corresponding to the limit values. The number of the limit values and limit names must be the same.
+    - strLimitOperator - The operator to be used to compare values against this limit when deciding if they exceed it or not:
+    eq - equal to
+    ne - not equal to
+    lt - less than
+    le - less than or equal to
+    gt - greater than
+    ge - greater than or equal to
+
+  </Description>
+
+  <Parameter>
+    <Name>lstLimitValues</Name>
+    <Type>list</Type>
+  </Parameter>
+
+  <Parameter>
+    <Name>lstLimitNames</Name>
+    <Type>list</Type>
+  </Parameter>
+
+  <Parameter>
+    <Name>strLimitOperator</Name>
+    <Type>string</Type>
+  </Parameter>
+
+  <Result>
+    <Name>lstLimits</Name>
+    <Type>list</Type>
+  </Result>
+
+  <Commands>
+    uniCentimetre = unit.GetUnit ("Metric", "centimetre")
+
+    intLoopIndex = util.Assign(0)
+    intLimitValuesCount = collection.Size(lstLimitValues)
+    intLimitNamesCount = collection.Size(lstLimitNames)
+    test.FailIfNotEqual (intLimitValuesCount, intLimitNamesCount, "", "Number of limit values and limit names must be the same.")
+    forNextIndex = formula.Create("$intLoopIndex + 1")
+    lstLimits = collection.ListCreate ()
+
+    loopBegin:
+
+    control.GoToIf("$intLoopIndex == $intLimitValuesCount", "loopEnd")
+    oLimitValue = collection.ListGet(lstLimitValues, intLoopIndex)
+    strLimitName = collection.ListGet(lstLimitNames, intLoopIndex)
+    limLimit = limit.Create (strLimitName, oLimitValue, uniCentimetre, strLimitOperator)
+    collection.ListAdd (lstLimits , limLimit)
+    intLoopIndex = formula.Evaluate(forNextIndex, , "integer")
+    control.GoTo("loopBegin")
+
+    loopEnd:
+
+  </Commands>
+</Function>

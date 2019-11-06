@@ -1,0 +1,52 @@
+<?xml version = "1.0" encoding = "ISO-8859-1" ?>
+
+<Script>
+  <Description>Straighten Tracks and Assets</Description>
+  <Version>1.0</Version>
+  <Copyright>2018 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter required = "true">
+    <Name>strCorridor</Name>
+    <Type>string</Type>
+    <Source>corridor</Source>
+    <Alias>Line:</Alias>
+    <Default>10003</Default>
+  </Parameter>
+
+  <Commands>
+
+    parameter.SetValue ("VertexMeasurementType", "STRAIGHTENED")
+
+    parameter.SetValue ("StraighteningTrackTypePriority", "Main,Siding Track,Yard")
+
+    parameter.SetValue ("TrackSegmentTolerance", "2.54")
+    parameter.SetValue ("StraightenedTrackSeparation", "457.2")
+    parameter.SetValue ("StraightenedTrackBendDistance", "0")
+
+    corridor.StraightenTracks (strCorridor)
+
+    corridor.SetAssetOffsets (strCorridor, "Overbridge", "STRAIGHTENED", 0)
+    corridor.SetAssetOffsets (strCorridor, "Underbridge", "STRAIGHTENED", 0)
+    <!-- corridor.SetAssetOffsets (strCorridor, "Bridge (Other)", "STRAIGHTENED", 0) -->
+    corridor.SetAssetOffsets (strCorridor, "Communication", "STRAIGHTENED", 25)
+    corridor.SetAssetOffsets (strCorridor, "Culvert", "STRAIGHTENED", 0)
+    corridor.SetAssetOffsets (strCorridor, "Sub-Surface Drainage", "STRAIGHTENED", 0)
+    corridor.SetAssetOffsets (strCorridor, "Enclosure", "STRAIGHTENED", -2)
+    corridor.SetAssetOffsets (strCorridor, "Track Insulated Joint", "STRAIGHTENED", 0)
+    corridor.SetAssetOffsets (strCorridor, "Level Crossing", "STRAIGHTENED", 0)
+    corridor.SetAssetOffsets (strCorridor, "Level Crossing (Signal)", "STRAIGHTENED", 0)
+    corridor.SetAssetOffsets (strCorridor, "Miscellaneous Structure", "STRAIGHTENED", -1)
+    corridor.SetAssetOffsets (strCorridor, "Power Supply", "STRAIGHTENED", -100)
+    corridor.SetAssetOffsets (strCorridor, "Point", "STRAIGHTENED", 0)
+    corridor.SetAssetOffsets (strCorridor, "Signal", "STRAIGHTENED", 0)
+    corridor.SetAssetOffsets (strCorridor, "Signal Location", "STRAIGHTENED", 0)
+    corridor.SetAssetOffsets (strCorridor, "Train Detection", "STRAIGHTENED", 0)
+    corridor.SetAssetOffsets (strCorridor, "Telemetry", "STRAIGHTENED", 100)
+    corridor.SetAssetOffsets (strCorridor, "Turnout", "STRAIGHTENED", 0)
+    corridor.SetAssetOffsets (strCorridor, "Obsolete Equipment", "STRAIGHTENED", -1)
+
+    cache.Refresh ("layer")
+
+  </Commands>
+
+</Script>

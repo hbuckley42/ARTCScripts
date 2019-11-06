@@ -1,0 +1,239 @@
+<?xml version = "1.0" encoding = "ISO-8859-1" ?>
+
+<Script>
+  <Version>3.0</Version>
+  <Description>
+    Calculates trends and predictions from TG channels.
+  </Description>
+
+  <Parameter>
+    <Name>strSurvey</Name>
+    <Type>string</Type>
+    <Source>survey</Source>
+    <Alias>Survey:</Alias>
+    <Default>IMP-AK Track Geometry Run 32593 20190121</Default>
+  </Parameter>
+
+  <Parameter>
+    <Name>strSegmentType</Name>
+    <Type>string</Type>
+    <Alias>Uniform Length Segment:</Alias>
+    <Source>choice</Source>
+    <Choice>100 metre</Choice>
+    <Choice>200 metre</Choice>
+    <Default>200 metre</Default>
+  </Parameter>
+
+  <Commands>
+
+    console.ShowValue ("$Copyright: (c) 2017 Bentley Systems, Incorporated. All rights reserved.", "")
+    <!--
+    ##################################################################################################
+      Output:
+      Category:  TG SD Trend
+      Type:      TG SD Trend
+      Attributes: WT20 SD Level
+                  MT70 SD Level
+                  AL35 SD Level
+                  AL70 SD Level
+     
+     Category:   Geom_SD_Predict
+     Type:       AL35
+                 AL70
+                 MT70
+                 WT20
+     Attributes: Channel
+                 Limit Date
+                 SD Level
+                 
+     Rename imported survey to PRO- (processed), only if IP3- survey is passed as the argument
+    ##################################################################################################    -->
+
+    <!-- Check survey has an IMP- or PRO- prefix and is a Track Sys or LR3 survey -->
+    strMessageNoSurveysToprocess = string.Append ("There are no surveys to process\n")
+    intIndexOfStar = string.IndexOf (strSurvey, "*")
+    <!-- test.ExitIfNotEqual (intIndexOfStar, -1, "", strMessageNoSurveysToprocess) -->
+
+    strMessage = string.Append ("This script can be only used to process  Track Geometry surveys. \n")
+    strMessage = string.Append (strMessage, "The given file name does not match a TG file name format.\n")
+    strMessage = string.Append (strMessage, "TG file name format examples: IMP-AK Track Geometry.*")
+    test.FailIfNotMatch (strSurvey, "^(ALN|IMP|PRO)-AK Track Geometry.*", "", strMessage)
+
+    strRawSurvey = string.SubString (strSurvey, 5)
+    strSurveyIMP = string.Append ("IMP-", strRawSurvey)
+    strChannelAttrName = string.Append ("Channel")
+
+    <!-- Event category, type and attribute definitions -->
+    strSurveyCategory = string.Append ("Survey")
+    strSurveyNameAttrName = string.Append ("Survey Name")
+    strSurveyDateAttrName = string.Append ("Survey Date")
+    strSurveyTypeTGImported = string.Append ("TG Imported")
+
+    <!-- TG SDs -->
+    strSDCategory = string.Append ("Track Geometry SD")
+    strSDType = string.Append ("Track Geometry SD")
+    strAttrSDLevelWT20 = util.Assign ("SD Level Worst Surface 20")
+
+    strPredictionCategory = string.Append ("TG SD Predict")
+    strPredictTypeWT20 = string.Append ("Worst Surface 20")
+    strEndDateAttrName  = string.Append ("End Date")
+    strLengthAttrName = string.Append ("Length")
+
+
+    strLimitDateAttrName = string.Append ("Limit Date")
+    strSDLevelAttrName = string.Append ("SD Level")
+
+    <!-- Mask-->
+    strSegmentCategoryName = string.Append ("Segment")
+    strSegmentType = string.Append ("200")
+
+    <!-- Work Events-->
+    strWorkCategory = string.Append ("Ellipse Work Order")
+    strTampingType = string.Append ("Ellipse Work Order")
+    strDaysSinceLastTampAttrName = string.Append ("DaysSinceLastTamp")
+    strTampingDateAttrName = string.Append ("Tamping Date")
+    strWorkStatusAttrName = string.Append ("Closure Status")
+    strWorkStatusClosed = string.Append ("C - Completed")
+
+
+    <!-- TG SD Trend -->
+    strTrendCategory = string.Append ("TG SD Trend")
+    strTrendType = string.Append ("TG SD Trend")
+    lstAttributesToTrend = collection.ListCreate (strAttrSDLevelWT20)
+
+    <!--
+    ##################################################################################################
+      Units Definition
+    ##################################################################################################    -->
+    uniCentimetre = unit.GetUnit ("Metric", "centimetre")
+    uniMetre = unit.GetUnit ("Metric", "metre")
+
+    <!--
+    ##################################################################################################
+      Global Formulas Definition
+    ##################################################################################################    -->
+
+    strDaysSinceLastTampFormula = string.Append ("DayAge ('",strSurveyDateAttrName,"','",strTampingDateAttrName,"')")
+    forDaysSinceLastTamp = formula.Create (strDaysSinceLastTampFormula)
+
+    <!--
+    ##################################################################################################
+       Limits Definition
+    ##################################################################################################    -->
+
+    <!--
+    ##################################################################################################
+      Filters Definition
+    ##################################################################################################    -->
+
+    filGT0 = filter.CreateGreaterThanFilter (0.0)
+    atrFilLengthGT0 = filter.CreateAttributeFilter (strLengthAttrName, filGT0)
+    evtFilLengthGT0 = filter.CreateEventValueFilter (atrFilLengthGT0)
+
+    atrFilDaysSinceLastTampGT0 = filter.CreateAttributeFilter (strDaysSinceLastTampAttrName, filGT0)
+    evtFilDaysSinceLastTampGT0 = filter.CreateEventValueFilter (atrFilDaysSinceLastTampGT0)
+
+    filEQWorkStatusClosed = filter.CreateEqualsFilter (strWorkStatusClosed)
+    atrFilWorkStatusEQWorkStatusClosed = filter.CreateAttributeFilter (strWorkStatusAttrName, filEQWorkStatusClosed)
+    evtFilWorkStatusEQWorkStatusClosed = filter.CreateEventValueFilter (atrFilWorkStatusEQWorkStatusClosed)
+
+    datTrendFrom = util.ParseDate ("2018-07-20", "yyyy-MM-dd")
+    filGTTrendFrom = filter.CreateGreaterThanFilter (datTrendFrom)
+    atrFilSurveyDateGTTrendFrom = filter.CreateAttributeFilter (strSurveyDateAttrName, filGTTrendFrom)
+    evtFilSurveyDateGTTrendFrom = filter.CreateEventValueFilter (atrFilSurveyDateGTTrendFrom)
+
+
+    <!--
+    ##################################################################################################
+      Step 1 Load Data
+    ##################################################################################################    -->
+
+    estSD = event.LoadByMaskAttribute  (strSDCategory, strSDType, strSurveyCategory, strSurveyTypeTGImported, strSurveyNameAttrName, strRawSurvey)
+    estMaintenance = event.LoadByMaskAttribute  (strWorkCategory, , strSurveyCategory, strSurveyTypeTGImported, strSurveyNameAttrName, strRawSurvey)
+
+    <!--
+    ##################################################################################################
+      Step 2 Process
+      Create fall back event set - use the closed events for maintenance
+      Merge with most recent maintenance dates, and calculate days since most recent maintenance
+      Find all surveys which occur after the last maintenance
+    ##################################################################################################    -->
+
+    estMaintenance = event.Filter (estMaintenance, evtFilWorkStatusEQWorkStatusClosed)
+    estMaintenance = event.SetAttributeToStartDate (estMaintenance, strTampingDateAttrName)
+    estMaintenance = event.SetAttribute (estMaintenance, strSurveyDateAttrName, 01-01-1900)
+    estMaintenance = event.StackMaximum (estMaintenance, strTampingDateAttrName)
+
+    <!-- Merge with most recent maintenance dates, and calculate days since most recent maintenance -->
+    estSD = event.SetAttribute (estSD, strTampingDateAttrName, 01-01-1900)
+    estSD = event.Aggregate (estSD, estMaintenance, strTampingDateAttrName, strTampingDateAttrName, "Maximum")
+
+    <!-- TODO: In a production: Find all surveys which occur after the last maintenance, for the demo this script simply trends and predict from a hardcoded date -->
+    <!-- 
+    estSD = event.CalculateAttribute (estSD, forDaysSinceLastTamp, strDaysSinceLastTampAttrName, "double")
+    estSD = event.Filter (estSD, evtFilDaysSinceLastTampGT0)
+    estSD = event.SetDatesToAttributes (estSD, strSurveyDateAttrName, strSurveyDateAttrName)-->
+
+    <!-- for the demo only this script simply trends and predict from a hardcoded date-->
+    estSD = event.Filter (estSD, evtFilSurveyDateGTTrendFrom)
+    estSD = event.SetDatesToAttributes (estSD, strSurveyDateAttrName, strSurveyDateAttrName)
+
+    <!--
+    ##################################################################################################
+      Step 3 Generate the final mask
+    ##################################################################################################    -->
+    estSDMask = event.RemoveAllAttributes (estSD)
+    estSDMask = event.Segment (estSDMask)
+    estSDMask = event.Separate (estSDMask)
+
+    estRangeToProcess = event.MergeWithinDistance (estSDMask, 5, uniMetre)
+
+    estSDMask = event.SetAttributeToLength (estSDMask, strLengthAttrName, uniCentimetre)
+    estSDMask = event.Filter (estSDMask, evtFilLengthGT0)
+    estSDMask = event.RemoveAttribute (estSDMask, strLengthAttrName)
+
+    <!--
+    ##################################################################################################
+      Step 4 Generate Trends over 27 months every 3 months
+      for each attribute from lstAttributesToTrend list and store as strSurveyDateAttrName attribute
+    ##################################################################################################    -->
+    mapFitFunctions = script.Call("F-FitFunctionsOverTime.spf", estSD, estSDMask, lstAttributesToTrend, "Linear")
+    estSDTrend = script.Call("F-CalculateFutureTrends.spf", estSDMask, 27, 3, mapFitFunctions)
+    estSDTrend = event.RetainAttributes (estSDTrend, lstAttributesToTrend)
+
+    <!--
+    ##################################################################################################
+      Step 5 Calculate prediction events
+   ##################################################################################################    -->
+    lstLimitValues = collection.ListCreate (1.0, 2.0, 3.0, 4.0)
+    mapAttrToPredictEvents = script.Call("F-PredictLimitExceedanceDates.spf", estSDMask, mapFitFunctions, lstLimitValues, strLimitDateAttrName, strSDLevelAttrName)
+
+    estWT20Predict = collection.MapGet (mapAttrToPredictEvents, strAttrSDLevelWT20)
+    estWT20Predict = event.SetAttribute (estWT20Predict, strChannelAttrName, strPredictTypeWT20)
+
+
+    <!--
+    ###################################################################################################################
+      Processing Step 8 - Delete old data and save new  
+    ###################################################################################################################    -->
+
+    <!-- Trends -->
+    event.DeleteByEvents (strTrendCategory, strTrendType, estRangeToProcess, "Overlaps", )
+    event.Save (estSDTrend, strTrendCategory, strTrendType)
+
+    <!-- Predictions -->
+    event.DeleteByEvents (strPredictionCategory, strPredictTypeWT20,  estRangeToProcess, "Overlaps", )
+    event.Save (estWT20Predict, strPredictionCategory, strPredictTypeWT20)
+
+
+    <!-- TODO: Move to a release script -->
+    strTrendLayer = string.Append ("TG SD Trend")
+    layer.CreateEventLayer (strTrendLayer, strTrendCategory, strTrendType)
+    strPredictionLayer = string.Append ("TG SD Predict")
+    layer.CreateEventLayer (strPredictionLayer, strPredictionCategory, strPredictTypeWT20)
+
+
+    end:
+  </Commands>
+
+</Script>

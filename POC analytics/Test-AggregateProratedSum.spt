@@ -1,0 +1,42 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Script>
+  <Version>1.0</Version>
+  <Description>Test ProratedSum</Description>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter required = "True">
+    <Name>strCorridor</Name>
+    <Type>string</Type>
+    <Source>corridor</Source>
+    <Alias>Corridor</Alias>
+	<Default>N40</Default>
+  </Parameter>
+
+  <Parameter required = "True">
+    <Name>strMarker</Name>
+    <Type>string</Type>
+    <Source>marker</Source>
+    <Alias>Marker</Alias>
+ 	<Default>405.0</Default>
+  </Parameter>
+
+  <Commands>
+
+	uniMetre = unit.GetUnit ("Metric", "metre")
+
+
+
+	estMask = event.CreateUniformLengthRangeEvents (strCorridor, strMarker, 0.0, strMarker, 50.0, uniMetre, , 20.0, uniMetre)
+
+	estTest = event.CreateUniformLengthRangeEvents (strCorridor, strMarker, 17.5, strMarker, 30.0, uniMetre, , 10.0, uniMetre)
+
+
+
+	estTest = event.SetAttribute (estTest, "Prorated", 100.0)
+	estTest = event.Aggregate (estMask, estTest, "Prorated", "Prorated Sum", "ProratedSum")
+console.ShowValue ("estTest", estTest)
+
+  </Commands>
+
+</Script>

@@ -1,0 +1,473 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Script>
+  <Description>Create track geometry limit events</Description>
+  <Version>1.4</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Commands>
+
+    <!--
+    ##################################################################################################
+    Initialise
+    ##################################################################################################
+    -->
+
+    <!-- Limits events category, types and attributes -->
+
+    strTGE1LimitCategory = string.Append ("TG E1 Limit")
+    strTGE2LimitCategory = string.Append ("TG E2 Limit")
+    strTGP1LimitCategory = string.Append ("TG P1 Limit")
+    strTGP2LimitCategory = string.Append ("TG P2 Limit")
+
+    strGaugeTightLimitType = string.Append ("Gauge - Tight")
+    strGaugeWideLimitType = string.Append ("Gauge - Wide")
+    strHAlignLimitType = string.Append ("Horizontal Alignment")
+    strTopLimitType = string.Append ("Top")
+    strTwistLongLimitType = string.Append ("Twist Long")
+    strTwistShortLimitType = string.Append ("Twist Short")
+
+    strLimitAttrName = string.Append ("Limit")
+    strMaxSpeedAttrName = string.Append ("Max. Speed (f/p)")
+    strLimitTypeAttrName = string.Append ("Limit Type")
+
+    <!-- Speed events category, types and attributes -->
+
+    strSpeedCategory = string.Append ("Speed Board")
+    strSpeedType = string.Append ("Speed Board")
+    strMaxSpeedFreightAttrName = string.Append ("Max Speed - Freight")
+    strMaxSpeedPassengerAttrName = string.Append ("Max Speed - Passenger")
+
+    strMaxSpeedFreightAttr = string.Append ("'", strMaxSpeedFreightAttrName, "'")
+    strMaxSpeedPassengerAttr = string.Append ("'", strMaxSpeedPassengerAttrName, "'")
+
+    <!-- Curve components category, types and attributes -->
+
+    strCurveCategory = string.Append ("Curve Component")
+
+    strArcType = string.Append ("Arc")
+    strTransitionType = string.Append ("Transition")
+    strStraightType = string.Append ("Straight")
+
+    strCurveTypeAttrName = string.Append ("Curve Type")
+    strRadiusAttrName = string.Append ("Radius")
+
+    <!-- Units -->
+
+    uniMetre = unit.GetUnit ("Metric", "metre")
+
+    <!--
+    ##################################################################################################
+    Filters
+    ##################################################################################################
+    -->
+
+    <!--
+		Filters for the speed limit bands:
+			115/160 - Max. freight speed above 100 or passenger above 115
+			100/115 - Max. freight speed above 80 or passenger above 90
+			80/90   - Max. freight speed above 60 or passenger above 65
+			60/65   - Max. freight or passenger speed above 40
+			40/40   - Max. freight or passenger speed above 20
+			20/20	- Everything else
+	-->
+
+    filGT115 = filter.CreateGreaterThanFilter (115.0)
+    filGT100 = filter.CreateGreaterThanFilter (100.0)
+    filGT90 = filter.CreateGreaterThanFilter (90.0)
+    filGT80 = filter.CreateGreaterThanFilter (80.0)
+    filGT65 = filter.CreateGreaterThanFilter (65.0)
+    filGT60 = filter.CreateGreaterThanFilter (60.0)
+    filGT40 = filter.CreateGreaterThanFilter (40.0)
+    filGT20 = filter.CreateGreaterThanFilter (20.0)
+
+    atrFilMaxSpeedFreightGT100 = filter.CreateAttributeFilter (strMaxSpeedFreightAttrName, filGT100)
+    atrFilMaxSpeedFreightGT80 = filter.CreateAttributeFilter (strMaxSpeedFreightAttrName, filGT80)
+    atrFilMaxSpeedFreightGT60 = filter.CreateAttributeFilter (strMaxSpeedFreightAttrName, filGT60)
+    atrFilMaxSpeedFreightGT40 = filter.CreateAttributeFilter (strMaxSpeedFreightAttrName, filGT40)
+    atrFilMaxSpeedFreightGT20 = filter.CreateAttributeFilter (strMaxSpeedFreightAttrName, filGT20)
+
+    atrFilMaxSpeedPassengerGT115 = filter.CreateAttributeFilter (strMaxSpeedPassengerAttrName, filGT115)
+    atrFilMaxSpeedPassengerGT90 = filter.CreateAttributeFilter (strMaxSpeedPassengerAttrName, filGT90)
+    atrFilMaxSpeedPassengerGT65 = filter.CreateAttributeFilter (strMaxSpeedPassengerAttrName, filGT65)
+    atrFilMaxSpeedPassengerGT40 = filter.CreateAttributeFilter (strMaxSpeedPassengerAttrName, filGT40)
+    atrFilMaxSpeedPassengerGT20 = filter.CreateAttributeFilter (strMaxSpeedPassengerAttrName, filGT20)
+
+    atrFilMaxSpeedBandF115P160 = filter.CreateOrFilter (atrFilMaxSpeedFreightGT100, atrFilMaxSpeedPassengerGT115)
+    evtFilMaxSpeedBandF115P160 = filter.CreateEventValueFilter (atrFilMaxSpeedBandF115P160)
+
+    atrFilMaxSpeedBandF100P115 = filter.CreateOrFilter (atrFilMaxSpeedFreightGT80, atrFilMaxSpeedPassengerGT90)
+    evtFilMaxSpeedBandF100P115 = filter.CreateEventValueFilter (atrFilMaxSpeedBandF100P115)
+
+    atrFilMaxSpeedBandF80F90 = filter.CreateOrFilter (atrFilMaxSpeedFreightGT60, atrFilMaxSpeedPassengerGT65)
+    evtFilMaxSpeedBandF80F90 = filter.CreateEventValueFilter (atrFilMaxSpeedBandF80F90)
+
+    atrFilMaxSpeedBandF60P65 = filter.CreateOrFilter (atrFilMaxSpeedFreightGT40, atrFilMaxSpeedPassengerGT40)
+    evtFilMaxSpeedBandF60P65 = filter.CreateEventValueFilter (atrFilMaxSpeedBandF60P65)
+
+    atrFilMaxSpeedBandF40P40 = filter.CreateOrFilter (atrFilMaxSpeedFreightGT20, atrFilMaxSpeedFreightGT20)
+    evtFilMaxSpeedBandF40P40 = filter.CreateEventValueFilter (atrFilMaxSpeedBandF40P40)
+
+    <!-- Filters for curve types -->
+
+    filEQArc = filter.CreateEqualsFilter (strArcType)
+    filEQTransition = filter.CreateEqualsFilter (strTransitionType)
+    filEQStraight = filter.CreateEqualsFilter (strStraightType)
+    filNEStraight = filter.CreateNotFilter (filEQStraight)
+
+    atrFilCurveTypeEQArc = filter.CreateAttributeFilter (strCurveTypeAttrName, filEQArc)
+    evtFilCurveTypeEQArc = filter.CreateEventValueFilter (atrFilCurveTypeEQArc)
+
+    atrFilCurveTypeEQTransition = filter.CreateAttributeFilter (strCurveTypeAttrName, filEQTransition)
+    evtFilCurveTypeEQTransition = filter.CreateEventValueFilter (atrFilCurveTypeEQTransition)
+
+    atrFilCurveTypeEQStraight = filter.CreateAttributeFilter (strCurveTypeAttrName, filEQStraight)
+    evtFilCurveTypeEQStraight = filter.CreateEventValueFilter (atrFilCurveTypeEQStraight)
+
+    atrFilCurveTypeNEStraight = filter.CreateAttributeFilter (strCurveTypeAttrName, filNEStraight)
+    evtFilCurveTypeNEStraight = filter.CreateEventValueFilter (atrFilCurveTypeNEStraight)
+
+    <!--
+    ##################################################################################################
+    Formula
+    ##################################################################################################
+    -->
+
+    <!-- Formulas to create negative limits from positive limits -->
+
+    strForNegateLimit = string.Append ("'", strLimitAttrName, "' * -1")
+    forNegateLimit = formula.Create (strForNegateLimit)
+
+    <!--
+    ##################################################################################################
+    Load data
+	  a. Load the speed limit events to use as basis for the limits
+	  b. Combine freight and passenger speed limits into single attribute and remove other attributes
+	  c. Filter speed limits on speed limit attributes
+	  d. Load the curve event set, and filter into straight, transition, arc and not-straight
+	  e. Remove all attributes from curve event set, then merge curve/transition event set 
+    ##################################################################################################
+    -->
+
+    <!-- Speed limits -->
+
+    estSpeed = event.LoadByCategory (strSpeedCategory, strSpeedType)
+    estSpeed = event.Separate (estSpeed)
+    estSpeed = event.FormatAttribute (estSpeed, strMaxSpeedAttrName, "%d/%d", strMaxSpeedFreightAttr, strMaxSpeedPassengerAttr)
+
+    estSpeedF115P160 = event.Filter (estSpeed, evtFilMaxSpeedBandF115P160)
+    estSpeed = event.Subtract (estSpeed, estSpeedF115P160)
+    estSpeedF100P115 = event.Filter (estSpeed, evtFilMaxSpeedBandF100P115)
+    estSpeed = event.Subtract (estSpeed, estSpeedF100P115)
+
+    estSpeedF115P160 = event.RetainAttribute (estSpeedF115P160, strMaxSpeedAttrName)
+    estSpeedF100P115 = event.RetainAttribute (estSpeedF100P115, strMaxSpeedAttrName)
+
+    <!-- Curves -->
+
+    estCurves = event.LoadByCategory (strCurveCategory, , strCurveTypeAttrName)
+
+    estStraight = event.Filter (estCurves, evtFilCurveTypeEQStraight)
+    estTransition = event.Filter (estCurves, evtFilCurveTypeEQTransition)
+    estArc = event.Filter (estCurves, evtFilCurveTypeEQArc)
+
+    estStraight = event.RemoveAllAttributes (estStraight)
+    estTransition = event.RemoveAllAttributes (estTransition)
+    estArc = event.RemoveAllAttributes (estArc)
+
+    <!--
+    ##################################################################################################
+    Set the limit values for each limit type for each limit band
+	  a. Set gauge tight and wide limits for 100/115 speed band
+	  b. Set horizontal alignment limits for 100/115 speed band
+	  c. Set top limits for 100/115 speed band
+	  d. Set twist limits for 100/115 speed band, different values for transition curves
+	  e. Set twist short limits for 100/115 speed band
+      f. Combine limit event sets, for each limit
+	  g. Repeat steps a to f for 115/160 speed band
+    ##################################################################################################
+    -->
+
+    <!-- ** 100/115 speed band limits ** -->
+
+    <!-- Gauge -->
+
+    estTGLimitGaugeTight = event.SetAttribute (estSpeedF100P115, strLimitTypeAttrName, strGaugeTightLimitType)
+    estTGE1LimitGaugeTight = event.SetAttribute (estTGLimitGaugeTight, strLimitAttrName, -17.0)
+    estTGE2LimitGaugeTight = event.SetAttribute (estTGLimitGaugeTight, strLimitAttrName, -15.0)
+    estTGP1LimitGaugeTight = event.SetAttribute (estTGLimitGaugeTight, strLimitAttrName, -13.0)
+    estTGP2LimitGaugeTight = event.SetAttribute (estTGLimitGaugeTight, strLimitAttrName, -11.0)
+
+    estTGLimitGaugeWide = event.SetAttribute (estSpeedF100P115, strLimitTypeAttrName, strGaugeWideLimitType)
+    estTGE1LimitGaugeWide = event.SetAttribute (estTGLimitGaugeWide, strLimitAttrName, 29.0)
+    estTGE2LimitGaugeWide = event.SetAttribute (estTGLimitGaugeWide, strLimitAttrName, 27.0)
+    estTGP1LimitGaugeWide = event.SetAttribute (estTGLimitGaugeWide, strLimitAttrName, 25.0)
+    estTGP2LimitGaugeWide = event.SetAttribute (estTGLimitGaugeWide, strLimitAttrName, 23.0)
+
+    <!-- Horizontal Alignment -->
+
+    estTGLimitHAlignPositive = event.SetAttribute (estSpeedF100P115, strLimitTypeAttrName, strHAlignLimitType)
+    estTGE1LimitHAlignPositive = event.SetAttribute (estTGLimitHAlignPositive, strLimitAttrName, 45.0)
+    estTGE2LimitHAlignPositive = event.SetAttribute (estTGLimitHAlignPositive, strLimitAttrName, 35.0)
+    estTGP1LimitHAlignPositive = event.SetAttribute (estTGLimitHAlignPositive, strLimitAttrName, 25.0)
+    estTGP2LimitHAlignPositive = event.SetAttribute (estTGLimitHAlignPositive, strLimitAttrName, 19.0)
+
+    estTGE1LimitHAlignNegative = event.CalculateAttribute (estTGE1LimitHAlignPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGE2LimitHAlignNegative = event.CalculateAttribute (estTGE2LimitHAlignPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGP1LimitHAlignNegative = event.CalculateAttribute (estTGP1LimitHAlignPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGP2LimitHAlignNegative = event.CalculateAttribute (estTGP2LimitHAlignPositive, forNegateLimit, strLimitAttrName, "double")
+
+    estTGE1LimitHAlign = event.Add (estTGE1LimitHAlignPositive, estTGE1LimitHAlignNegative)
+    estTGE2LimitHAlign = event.Add (estTGE2LimitHAlignPositive, estTGE2LimitHAlignNegative)
+    estTGP1LimitHAlign = event.Add (estTGP1LimitHAlignPositive, estTGP1LimitHAlignNegative)
+    estTGP2LimitHAlign = event.Add (estTGP2LimitHAlignPositive, estTGP2LimitHAlignPositive)
+
+    <!-- Top -->
+
+    estTGLimitTopPositive = event.SetAttribute (estSpeedF100P115, strLimitTypeAttrName, strTopLimitType)
+    estTGE1LimitTopPositive = event.SetAttribute (estTGLimitTopPositive, strLimitAttrName, 36.0)
+    estTGE2LimitTopPositive = event.SetAttribute (estTGLimitTopPositive, strLimitAttrName, 33.0)
+    estTGP1LimitTopPositive = event.SetAttribute (estTGLimitTopPositive, strLimitAttrName, 29.0)
+    estTGP2LimitTopPositive = event.SetAttribute (estTGLimitTopPositive, strLimitAttrName, 27.0)
+
+    estTGE1LimitTopNegative = event.CalculateAttribute (estTGE1LimitTopPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGE2LimitTopNegative = event.CalculateAttribute (estTGE2LimitTopPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGP1LimitTopNegative = event.CalculateAttribute (estTGP1LimitTopPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGP2LimitTopNegative = event.CalculateAttribute (estTGP2LimitTopPositive, forNegateLimit, strLimitAttrName, "double")
+
+    estTGE1LimitTop = event.Add (estTGE1LimitTopPositive, estTGE1LimitTopNegative)
+    estTGE2LimitTop = event.Add (estTGE2LimitTopPositive, estTGE2LimitTopNegative)
+    estTGP1LimitTop = event.Add (estTGP1LimitTopPositive, estTGP1LimitTopNegative)
+    estTGP2LimitTop = event.Add (estTGP2LimitTopPositive, estTGP2LimitTopNegative)
+
+    <!-- Twist -->
+
+    estTGLimitTwist = event.SetAttribute (estSpeedF100P115, strLimitTypeAttrName, strTwistLongLimitType)
+
+    estTGLimitTwistTransition = event.Intersect (estTGLimitTwist, estTransition)
+    estTGLimitTwistNonTransition = event.Subtract (estTGLimitTwist, estTGLimitTwistTransition)
+
+    estTGE1LimitTwistTransition = event.SetAttribute (estTGLimitTwistTransition, strLimitAttrName, 56.0)
+    estTGE2LimitTwistTransition = event.SetAttribute (estTGLimitTwistTransition, strLimitAttrName, 50.0)
+    estTGP1LimitTwistTransition = event.SetAttribute (estTGLimitTwistTransition, strLimitAttrName, 43.0)
+    estTGP2LimitTwistTransition = event.SetAttribute (estTGLimitTwistTransition, strLimitAttrName, 38.0)
+
+    estTGE1LimitTwistNonTransition = event.SetAttribute (estTGLimitTwistNonTransition, strLimitAttrName, 53.0)
+    estTGE2LimitTwistNonTransition = event.SetAttribute (estTGLimitTwistNonTransition, strLimitAttrName, 47.0)
+    estTGP1LimitTwistNonTransition = event.SetAttribute (estTGLimitTwistNonTransition, strLimitAttrName, 41.0)
+    estTGP2LimitTwistNonTransition = event.SetAttribute (estTGLimitTwistNonTransition, strLimitAttrName, 36.0)
+
+    estTGE1LimitTwistPositive = event.Add (estTGE1LimitTwistTransition, estTGE1LimitTwistNonTransition)
+    estTGE2LimitTwistPositive = event.Add (estTGE2LimitTwistTransition, estTGE2LimitTwistNonTransition)
+    estTGP1LimitTwistPositive = event.Add (estTGP1LimitTwistTransition, estTGP1LimitTwistNonTransition)
+    estTGP2LimitTwistPositive = event.Add (estTGP2LimitTwistTransition, estTGP2LimitTwistNonTransition)
+
+    estTGE1LimitTwistNegative = event.CalculateAttribute (estTGE1LimitTwistPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGE2LimitTwistNegative = event.CalculateAttribute (estTGE2LimitTwistPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGP1LimitTwistNegative = event.CalculateAttribute (estTGP1LimitTwistPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGP2LimitTwistNegative = event.CalculateAttribute (estTGP2LimitTwistPositive, forNegateLimit, strLimitAttrName, "double")
+
+    estTGE1LimitTwist = event.Add (estTGE1LimitTwistPositive, estTGE1LimitTwistNegative)
+    estTGE2LimitTwist = event.Add (estTGE2LimitTwistPositive, estTGE2LimitTwistNegative)
+    estTGP1LimitTwist = event.Add (estTGP1LimitTwistPositive, estTGP1LimitTwistNegative)
+    estTGP2LimitTwist = event.Add (estTGP2LimitTwistPositive, estTGP2LimitTwistNegative)
+
+    <!-- Twist Short -->
+
+    estTGLimitTwistShortPositive = event.SetAttribute (estSpeedF100P115, strLimitTypeAttrName, strTwistShortLimitType)
+    estTGE1LimitTwistShortPositive = event.SetAttribute (estTGLimitTwistShortPositive, strLimitAttrName, 21.0)
+    estTGE2LimitTwistShortPositive = event.SetAttribute (estTGLimitTwistShortPositive, strLimitAttrName, 19.0)
+    estTGP1LimitTwistShortPositive = event.SetAttribute (estTGLimitTwistShortPositive, strLimitAttrName, 17.0)
+    estTGP2LimitTwistShortPositive = event.SetAttribute (estTGLimitTwistShortPositive, strLimitAttrName, 15.0)
+
+    estTGE1LimitTwistShortNegative = event.CalculateAttribute (estTGE1LimitTwistShortPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGE2LimitTwistShortNegative = event.CalculateAttribute (estTGE2LimitTwistShortPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGP1LimitTwistShortNegative = event.CalculateAttribute (estTGP1LimitTwistShortPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGP2LimitTwistShortNegative = event.CalculateAttribute (estTGP2LimitTwistShortPositive, forNegateLimit, strLimitAttrName, "double")
+
+    estTGE1LimitTwistShort = event.Add (estTGE1LimitTwistShortPositive, estTGE1LimitTwistShortNegative)
+    estTGE2LimitTwistShort = event.Add (estTGE2LimitTwistShortPositive, estTGE2LimitTwistShortNegative)
+    estTGP1LimitTwistShort = event.Add (estTGP1LimitTwistShortPositive, estTGP1LimitTwistShortNegative)
+    estTGP2LimitTwistShort = event.Add (estTGP2LimitTwistShortPositive, estTGP2LimitTwistShortNegative)
+
+    <!-- Combine all 100/115 limits into one event set for each limit type -->
+
+    estTGE1LimitF100P115 = event.Add (estTGE1LimitGaugeTight, estTGE1LimitGaugeWide)
+    estTGE1LimitF100P115 = event.Add (estTGE1LimitF100P115, estTGE1LimitHAlign)
+    estTGE1LimitF100P115 = event.Add (estTGE1LimitF100P115, estTGE1LimitTop)
+    estTGE1LimitF100P115 = event.Add (estTGE1LimitF100P115, estTGE1LimitTwist)
+    estTGE1LimitF100P115 = event.Add (estTGE1LimitF100P115, estTGE1LimitTwistShort)
+
+    estTGE2LimitF100P115 = event.Add (estTGE2LimitGaugeTight, estTGE2LimitGaugeWide)
+    estTGE2LimitF100P115 = event.Add (estTGE2LimitF100P115, estTGE2LimitHAlign)
+    estTGE2LimitF100P115 = event.Add (estTGE2LimitF100P115, estTGE2LimitTop)
+    estTGE2LimitF100P115 = event.Add (estTGE2LimitF100P115, estTGE2LimitTwist)
+    estTGE2LimitF100P115 = event.Add (estTGE2LimitF100P115, estTGE2LimitTwistShort)
+
+    estTGP1LimitF100P115 = event.Add (estTGP1LimitGaugeTight, estTGP1LimitGaugeWide)
+    estTGP1LimitF100P115 = event.Add (estTGP1LimitF100P115, estTGP1LimitHAlign)
+    estTGP1LimitF100P115 = event.Add (estTGP1LimitF100P115, estTGP1LimitTop)
+    estTGP1LimitF100P115 = event.Add (estTGP1LimitF100P115, estTGP1LimitTwist)
+    estTGP1LimitF100P115 = event.Add (estTGP1LimitF100P115, estTGP1LimitTwistShort)
+
+    estTGP2LimitF100P115 = event.Add (estTGP2LimitGaugeTight, estTGP2LimitGaugeWide)
+    estTGP2LimitF100P115 = event.Add (estTGP2LimitF100P115, estTGP2LimitHAlign)
+    estTGP2LimitF100P115 = event.Add (estTGP2LimitF100P115, estTGP2LimitTop)
+    estTGP2LimitF100P115 = event.Add (estTGP2LimitF100P115, estTGP2LimitTwist)
+    estTGP2LimitF100P115 = event.Add (estTGP2LimitF100P115, estTGP2LimitTwistShort)
+
+    <!-- ** 125/160 speed band limits ** -->
+
+    <!-- Gauge -->
+
+    estTGLimitGaugeTight = event.SetAttribute (estSpeedF115P160, strLimitTypeAttrName, strGaugeTightLimitType)
+    estTGE1LimitGaugeTight = event.SetAttribute (estTGLimitGaugeTight, strLimitAttrName, -15.0)
+    estTGE2LimitGaugeTight = event.SetAttribute (estTGLimitGaugeTight, strLimitAttrName, -13.0)
+    estTGP1LimitGaugeTight = event.SetAttribute (estTGLimitGaugeTight, strLimitAttrName, -11.0)
+    estTGP2LimitGaugeTight = event.CreateEmptyEventSet () <!-- No tight gauge P2 limit -->
+
+    estTGLimitGaugeWide = event.SetAttribute (estSpeedF115P160, strLimitTypeAttrName, strGaugeWideLimitType)
+    estTGE1LimitGaugeWide = event.SetAttribute (estTGLimitGaugeWide, strLimitAttrName, 27.0)
+    estTGE2LimitGaugeWide = event.SetAttribute (estTGLimitGaugeWide, strLimitAttrName, 25.0)
+    estTGP1LimitGaugeWide = event.SetAttribute (estTGLimitGaugeWide, strLimitAttrName, 23.0)
+    estTGP2LimitGaugeWide = event.SetAttribute (estTGLimitGaugeWide, strLimitAttrName, 21.0)
+
+    <!-- Horizontal Alignment -->
+
+    estTGLimitHAlignPositive = event.SetAttribute (estSpeedF115P160, strLimitTypeAttrName, strHAlignLimitType)
+    estTGE1LimitHAlignPositive = event.SetAttribute (estTGLimitHAlignPositive, strLimitAttrName, 35.0)
+    estTGE2LimitHAlignPositive = event.SetAttribute (estTGLimitHAlignPositive, strLimitAttrName, 25.0)
+    estTGP1LimitHAlignPositive = event.SetAttribute (estTGLimitHAlignPositive, strLimitAttrName, 19.0)
+    estTGP2LimitHAlignPositive = event.SetAttribute (estTGLimitHAlignPositive, strLimitAttrName, 15.0)
+
+    estTGE1LimitHAlignNegative = event.CalculateAttribute (estTGE1LimitHAlignPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGE2LimitHAlignNegative = event.CalculateAttribute (estTGE2LimitHAlignPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGP1LimitHAlignNegative = event.CalculateAttribute (estTGP1LimitHAlignPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGP2LimitHAlignNegative = event.CalculateAttribute (estTGP2LimitHAlignPositive, forNegateLimit, strLimitAttrName, "double")
+
+    estTGE1LimitHAlign = event.Add (estTGE1LimitHAlignPositive, estTGE1LimitHAlignNegative)
+    estTGE2LimitHAlign = event.Add (estTGE2LimitHAlignPositive, estTGE2LimitHAlignNegative)
+    estTGP1LimitHAlign = event.Add (estTGP1LimitHAlignPositive, estTGP1LimitHAlignNegative)
+    estTGP2LimitHAlign = event.Add (estTGP2LimitHAlignPositive, estTGP2LimitHAlignNegative)
+
+    <!-- Top -->
+
+    estTGLimitTopPositive = event.SetAttribute (estSpeedF115P160, strLimitTypeAttrName, strTopLimitType)
+    estTGE1LimitTopPositive = event.SetAttribute (estTGLimitTopPositive, strLimitAttrName, 33.0)
+    estTGE2LimitTopPositive = event.SetAttribute (estTGLimitTopPositive, strLimitAttrName, 29.0)
+    estTGP1LimitTopPositive = event.SetAttribute (estTGLimitTopPositive, strLimitAttrName, 27.0)
+    estTGP2LimitTopPositive = event.SetAttribute (estTGLimitTopPositive, strLimitAttrName, 24.0)
+
+    estTGE1LimitTopNegative = event.CalculateAttribute (estTGE1LimitTopPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGE2LimitTopNegative = event.CalculateAttribute (estTGE2LimitTopPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGP1LimitTopNegative = event.CalculateAttribute (estTGP1LimitTopPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGP2LimitTopNegative = event.CalculateAttribute (estTGP2LimitTopPositive, forNegateLimit, strLimitAttrName, "double")
+
+    estTGE1LimitTop = event.Add (estTGE1LimitTopPositive, estTGE1LimitTopNegative)
+    estTGE2LimitTop = event.Add (estTGE2LimitTopPositive, estTGE2LimitTopNegative)
+    estTGP1LimitTop = event.Add (estTGP1LimitTopPositive, estTGP1LimitTopNegative)
+    estTGP2LimitTop = event.Add (estTGP2LimitTopPositive, estTGP2LimitTopNegative)
+
+    <!-- Twist -->
+
+    estTGLimitTwist = event.SetAttribute (estSpeedF115P160, strLimitTypeAttrName, strTwistLongLimitType)
+
+    estTGLimitTwistTransition = event.Intersect (estTGLimitTwist, estTransition)
+    estTGLimitTwistNonTransition = event.Subtract (estTGLimitTwist, estTGLimitTwistTransition)
+
+    estTGE1LimitTwistTransition = event.SetAttribute (estTGLimitTwistTransition, strLimitAttrName, 50.0)
+    estTGE2LimitTwistTransition = event.SetAttribute (estTGLimitTwistTransition, strLimitAttrName, 43.0)
+    estTGP1LimitTwistTransition = event.SetAttribute (estTGLimitTwistTransition, strLimitAttrName, 38.0)
+    estTGP2LimitTwistTransition = event.SetAttribute (estTGLimitTwistTransition, strLimitAttrName, 33.0)
+
+    estTGE1LimitTwistNonTransition = event.SetAttribute (estTGLimitTwistNonTransition, strLimitAttrName, 47.0)
+    estTGE2LimitTwistNonTransition = event.SetAttribute (estTGLimitTwistNonTransition, strLimitAttrName, 41.0)
+    estTGP1LimitTwistNonTransition = event.SetAttribute (estTGLimitTwistNonTransition, strLimitAttrName, 36.0)
+    estTGP2LimitTwistNonTransition = event.SetAttribute (estTGLimitTwistNonTransition, strLimitAttrName, 31.0)
+
+    estTGE1LimitTwistPositive = event.Add (estTGE1LimitTwistTransition, estTGE1LimitTwistNonTransition)
+    estTGE2LimitTwistPositive = event.Add (estTGE2LimitTwistTransition, estTGE2LimitTwistNonTransition)
+    estTGP1LimitTwistPositive = event.Add (estTGP1LimitTwistTransition, estTGP1LimitTwistNonTransition)
+    estTGP2LimitTwistPositive = event.Add (estTGP2LimitTwistTransition, estTGP2LimitTwistNonTransition)
+
+    estTGE1LimitTwistNegative = event.CalculateAttribute (estTGE1LimitTwistPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGE2LimitTwistNegative = event.CalculateAttribute (estTGE2LimitTwistPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGP1LimitTwistNegative = event.CalculateAttribute (estTGP1LimitTwistPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGP2LimitTwistNegative = event.CalculateAttribute (estTGP2LimitTwistPositive, forNegateLimit, strLimitAttrName, "double")
+
+    estTGE1LimitTwist = event.Add (estTGE1LimitTwistPositive, estTGE1LimitTwistNegative)
+    estTGE2LimitTwist = event.Add (estTGE2LimitTwistPositive, estTGE2LimitTwistNegative)
+    estTGP1LimitTwist = event.Add (estTGP1LimitTwistPositive, estTGP1LimitTwistNegative)
+    estTGP2LimitTwist = event.Add (estTGP2LimitTwistPositive, estTGP2LimitTwistNegative)
+
+    <!-- Twist Short -->
+
+    estTGLimitTwistShortPositive = event.SetAttribute (estSpeedF115P160, strLimitTypeAttrName, strTwistShortLimitType)
+    estTGE1LimitTwistShortPositive = event.SetAttribute (estTGLimitTwistShortPositive, strLimitAttrName, 19.0)
+    estTGE2LimitTwistShortPositive = event.SetAttribute (estTGLimitTwistShortPositive, strLimitAttrName, 17.0)
+    estTGP1LimitTwistShortPositive = event.SetAttribute (estTGLimitTwistShortPositive, strLimitAttrName, 15.0)
+    estTGP2LimitTwistShortPositive = event.SetAttribute (estTGLimitTwistShortPositive, strLimitAttrName, 12.0)
+
+    estTGE1LimitTwistShortNegative = event.CalculateAttribute (estTGE1LimitTwistShortPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGE2LimitTwistShortNegative = event.CalculateAttribute (estTGE2LimitTwistShortPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGP1LimitTwistShortNegative = event.CalculateAttribute (estTGP1LimitTwistShortPositive, forNegateLimit, strLimitAttrName, "double")
+    estTGP2LimitTwistShortNegative = event.CalculateAttribute (estTGP2LimitTwistShortPositive, forNegateLimit, strLimitAttrName, "double")
+
+    estTGE1LimitTwistShort = event.Add (estTGE1LimitTwistShortPositive, estTGE1LimitTwistShortNegative)
+    estTGE2LimitTwistShort = event.Add (estTGE2LimitTwistShortPositive, estTGE2LimitTwistShortNegative)
+    estTGP1LimitTwistShort = event.Add (estTGP1LimitTwistShortPositive, estTGP1LimitTwistShortNegative)
+    estTGP2LimitTwistShort = event.Add (estTGP2LimitTwistShortPositive, estTGP2LimitTwistShortNegative)
+
+    <!-- Combine all 115/160 limits into one event set  -->
+
+    estTGE1LimitF115P160 = event.Add (estTGE1LimitGaugeTight, estTGE1LimitGaugeWide)
+    estTGE1LimitF115P160 = event.Add (estTGE1LimitF115P160, estTGE1LimitHAlign)
+    estTGE1LimitF115P160 = event.Add (estTGE1LimitF115P160, estTGE1LimitTop)
+    estTGE1LimitF115P160 = event.Add (estTGE1LimitF115P160, estTGE1LimitTwist)
+    estTGE1LimitF115P160 = event.Add (estTGE1LimitF115P160, estTGE1LimitTwistShort)
+
+    estTGE2LimitF115P160 = event.Add (estTGE2LimitGaugeTight, estTGE2LimitGaugeWide)
+    estTGE2LimitF115P160 = event.Add (estTGE2LimitF115P160, estTGE2LimitHAlign)
+    estTGE2LimitF115P160 = event.Add (estTGE2LimitF115P160, estTGE2LimitTop)
+    estTGE2LimitF115P160 = event.Add (estTGE2LimitF115P160, estTGE2LimitTwist)
+    estTGE2LimitF115P160 = event.Add (estTGE2LimitF115P160, estTGE2LimitTwistShort)
+
+    estTGP1LimitF115P160 = event.Add (estTGP1LimitGaugeTight, estTGP1LimitGaugeWide)
+    estTGP1LimitF115P160 = event.Add (estTGP1LimitF115P160, estTGP1LimitHAlign)
+    estTGP1LimitF115P160 = event.Add (estTGP1LimitF115P160, estTGP1LimitTop)
+    estTGP1LimitF115P160 = event.Add (estTGP1LimitF115P160, estTGP1LimitTwist)
+    estTGP1LimitF115P160 = event.Add (estTGP1LimitF115P160, estTGP1LimitTwistShort)
+
+    estTGP2LimitF115P160 = event.Add (estTGP2LimitGaugeTight, estTGP2LimitGaugeWide)
+    estTGP2LimitF115P160 = event.Add (estTGP2LimitF115P160, estTGP2LimitHAlign)
+    estTGP2LimitF115P160 = event.Add (estTGP2LimitF115P160, estTGP2LimitTop)
+    estTGP2LimitF115P160 = event.Add (estTGP2LimitF115P160, estTGP2LimitTwist)
+    estTGP2LimitF115P160 = event.Add (estTGP2LimitF115P160, estTGP2LimitTwistShort)
+
+    <!--
+    ##################################################################################################
+    Save the events
+	  a. Combine events from different speed bands in one event set per limit type
+	  b. Delete all existing events
+	  c. Save the new events into the correct category and type
+    ##################################################################################################
+    -->
+
+    estTGE1Limit = event.Add (estTGE1LimitF100P115, estTGE1LimitF115P160)
+    estTGE2Limit = event.Add (estTGE2LimitF100P115, estTGE2LimitF115P160)
+    estTGP1Limit = event.Add (estTGP1LimitF100P115, estTGP1LimitF115P160)
+    estTGP2Limit = event.Add (estTGP2LimitF100P115, estTGP2LimitF115P160)
+
+    event.DeleteByCategory (strTGE1LimitCategory)
+    event.DeleteByCategory (strTGE2LimitCategory)
+    event.DeleteByCategory (strTGP1LimitCategory)
+    event.DeleteByCategory (strTGP2LimitCategory)
+
+    event.Save (estTGE1Limit, strTGE1LimitCategory, , strLimitTypeAttrName)
+    event.Save (estTGE2Limit, strTGE2LimitCategory, , strLimitTypeAttrName)
+    event.Save (estTGP1Limit, strTGP1LimitCategory, , strLimitTypeAttrName)
+    event.Save (estTGP2Limit, strTGP2LimitCategory, , strLimitTypeAttrName)
+
+  </Commands>
+
+</Script>

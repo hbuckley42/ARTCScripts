@@ -1,0 +1,261 @@
+<?xml version = "1.0" encoding = "utf-8" ?>
+
+<Script>
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+  <Description>
+    Process geometry to:
+    Calculate Exceptions
+    Calculate SDs
+  </Description>
+
+  <Parameter>
+    <Name>strSurvey</Name>
+    <Type>string</Type>
+    <Source>survey</Source>
+    <Alias>Survey:</Alias>
+    <Default>IMP-AK Rail Profile Run.*</Default>
+  </Parameter>
+
+  <Commands>
+
+    <!--
+    ##################################################################################################
+   
+    ##################################################################################################    -->
+    strCurveComponentCategory = util.Assign ("Curve Component")
+    strCurveComponentArc = util.Assign ("Arc")
+    strCurveComponentTransition = util.Assign ("Transition")
+
+    strRailWearTQICategory = util.Assign ("Rail Wear TQI")
+    strRailWearTQIType = util.Assign ("Rail Wear TQI (Curve Component)")
+
+    strChannelNameHeadLossLeft = util.Assign ("Head Loss Left")
+    strChannelNameHeadLossRight = util.Assign ("Head Loss Right")
+    strChannelNameVerticalWearLeft = util.Assign ("Vertical Wear Left")
+    strChannelNameVerticalWearRight = util.Assign ("Vertical Wear Right")
+    strChannelNameHeadHeightLeft = util.Assign ("Head Height Left")
+    strChannelNameHeadHeightRight = util.Assign ("Head Height Right")
+
+    strEndDateAttrName  = string.Append ("End Date")
+    strRawSurvey = string.SubString (strSurvey, 5)
+
+    lstOutputAttributes = collection.ListCreate ()
+    strAttrHeadLossLeft90Percentile = script.Call("subF-GetAttribute", lstOutputAttributes, "Head Loss Left 90th Percentile")
+    strAttrHeadLossRight90Percentile = script.Call("subF-GetAttribute", lstOutputAttributes, "Head Loss Right 90th Percentile")
+    strAttrWorstHeadLoss90Percentile = script.Call("subF-GetAttribute", lstOutputAttributes, "Worst Head Loss 90th Percentile")
+    strAttrHeadLossLeftMax = script.Call("subF-GetAttribute", lstOutputAttributes, "Head Loss Left Max")
+    strAttrHeadLossRightMax = script.Call("subF-GetAttribute", lstOutputAttributes, "Head Loss Right Max")
+    strAttrWorstHeadLossMax = script.Call("subF-GetAttribute", lstOutputAttributes, "Worst Head Loss Max")
+
+    strSurveyNameAttrName = script.Call("subF-GetAttribute", lstOutputAttributes, "Survey Name")
+    strSurveyDateAttrName = script.Call("subF-GetAttribute", lstOutputAttributes, "Survey Date")
+    strAttrSegment = script.Call("subF-GetAttribute", lstOutputAttributes, "Segment")
+    strAttrSegmentID = script.Call("subF-GetAttribute", lstOutputAttributes, "Segment ID")
+    strAttrCurveID = script.Call("subF-GetAttribute", lstOutputAttributes, "Curve ID")
+    strAttrRadius = script.Call("subF-GetAttribute", lstOutputAttributes, "Radius")
+    strAttrVersine = script.Call("subF-GetAttribute", lstOutputAttributes, "Versine")
+    strAttrCurveSide = script.Call("subF-GetAttribute", lstOutputAttributes, "Curve Side")
+
+    <!--
+    ##################################################################################################
+      Units Definition
+    ################################################################################################## -->
+    uniMetre = unit.GetUnit ("Metric", "metre")
+
+    <!--
+    ##################################################################################################
+      Global Formulas Definition
+    ################################################################################################## -->
+    strAdd2WeeksFormula = string.Append ("AddDays ('", strSurveyDateAttrName, "', 14)")
+    forAdd2Weeks = formula.Create (strAdd2WeeksFormula)
+
+    strAddMonthFormula = string.Append ("AddMonths ('", strSurveyDateAttrName, "', 1)")
+    forAddOneMonth = formula.Create (strAddMonthFormula)
+
+    strAttrHeadLossLeft90PercentileQ = string.Format ("'%s'", strAttrHeadLossLeft90Percentile)
+    strAttrHeadLossRight90PercentileQ = string.Format ("'%s'", strAttrHeadLossRight90Percentile)
+    forWorstHeadLoss90Percentile = formula.Create  ("$strAttrHeadLossLeft90PercentileQ > $strAttrHeadLossRight90Percentile", strAttrHeadLossLeft90PercentileQ, strAttrHeadLossRight90PercentileQ)
+
+    strAttrHeadLossLeftMaxQ = string.Format ("'%s'", strAttrHeadLossLeftMax)
+    strAttrHeadLossRightMaxQ = string.Format ("'%s'", strAttrHeadLossRightMax)
+    forWorstHeadLossMax = formula.Create  ("$strAttrHeadLossLeftMaxQ > $strAttrHeadLossRightMaxQ", strAttrHeadLossLeftMaxQ, strAttrHeadLossRightMaxQ)
+
+
+    <!--
+    ##################################################################################################
+       Limits Definition
+       A limit is exceeded when a value being compared against it is not in the range defined by the
+       limit value and operator.
+
+    ################################################################################################## -->
+    <!--
+    ##################################################################################################
+      Filters Definition  
+    ################################################################################################## -->
+
+    <!--
+    ###################################################################################################################
+      Processing Step 1 - Load 
+    ###################################################################################################################-->
+    datSurvey = survey.GetDate (strSurvey)
+    srmHeadLossLeft = stream.Load (strSurvey, strChannelNameHeadLossLeft)
+    srmHeadLossRight = stream.Load (strSurvey, strChannelNameHeadLossRight)
+    srmVerticalWearLeft = stream.Load (strSurvey, strChannelNameVerticalWearLeft)
+    srmVerticalWearRight = stream.Load (strSurvey, strChannelNameVerticalWearRight)
+    srmHeadHeightLeft = stream.Load (strSurvey, strChannelNameHeadHeightLeft)
+    srmHeadHeightRight = stream.Load (strSurvey, strChannelNameHeadHeightRight)
+
+    trvSurvey = stream.ToTraversals (srmHeadLossLeft)
+    estCurveArc = event.LoadByTraversal (strCurveComponentCategory, strCurveComponentArc, , , trvSurvey)
+    estCurveTransition = event.LoadByTraversal (strCurveComponentCategory, strCurveComponentTransition, , , trvSurvey)
+    estCurveMask = event.Add (estCurveArc, estCurveTransition)
+
+    <!--
+    ###################################################################################################################
+      Processing Step 1 - Calculate 
+    ###################################################################################################################-->
+
+    estTQI = stream.ComputePercentileOnEvents (srmHeadLossLeft, estCurveMask , strAttrHeadLossLeft90Percentile, 90.0, 0.8)
+    estTQI = stream.ComputePercentileOnEvents (srmHeadLossRight, estTQI , strAttrHeadLossRight90Percentile, 90.0, 0.8)
+    estTQI = event.CalculateAttribute (estTQI, forWorstHeadLoss90Percentile, strAttrWorstHeadLoss90Percentile, "double")
+
+    estTQI = stream.ComputeMaximumOnEvents (srmHeadLossLeft, estTQI , strAttrHeadLossLeftMax, 0.8)
+    estTQI = stream.ComputeMaximumOnEvents (srmHeadLossRight, estTQI , strAttrHeadLossRightMax, 0.8)
+    estTQI = event.CalculateAttribute (estTQI, forWorstHeadLossMax, strAttrWorstHeadLossMax, "double")
+
+    estTQI = script.Call("subF-RoundAttributeValue", estTQI, strAttrHeadLossLeft90Percentile)
+    estTQI = script.Call("subF-RoundAttributeValue", estTQI, strAttrHeadLossRight90Percentile)
+    estTQI = script.Call("subF-RoundAttributeValue", estTQI, strAttrWorstHeadLoss90Percentile)
+    estTQI = script.Call("subF-RoundAttributeValue", estTQI, strAttrHeadLossLeftMax)
+    estTQI = script.Call("subF-RoundAttributeValue", estTQI, strAttrHeadLossRightMax)
+    estTQI = script.Call("subF-RoundAttributeValue", estTQI, strAttrWorstHeadLossMax)
+    <!--
+    ###################################################################################################################
+      Processing Step 2 - 
+      Set the end date to Survey Date + 2 weeks
+    ################################################################################################################### -->
+    estTQI = script.Call("subF-SetEventsSurveyAndDates", estTQI, strRawSurvey, datSurvey, lstOutputAttributes,)
+    estTQI = event.CalculateAttribute (estTQI, forAddOneMonth, strEndDateAttrName, "date")
+    estTQI = event.SetDatesToAttributes (estTQI, strSurveyDateAttrName, strEndDateAttrName)
+    estTQI = event.RemoveAttribute (estTQI, strEndDateAttrName)
+
+    <!--
+    ###################################################################################################################
+      Processing Step 3 - Delete old and save new
+    ################################################################################################################### -->
+
+    event.DeleteByAttribute (strRailWearTQICategory, strRailWearTQIType, strSurveyNameAttrName, strRawSurvey)
+    event.Save (estTQI, strRailWearTQICategory, strRailWearTQIType)
+
+    strRailWearTQILayer = string.Append ("Rail Wear TQI")
+    layer.CreateEventLayer (strRailWearTQILayer, strRailWearTQICategory, strRailWearTQIType)
+    layer.SetLayerLabelAttribute (strRailWearTQILayer, strRailWearTQICategory, strAttrHeadLossLeftMax)
+    layer.SetLayerFlyByTextAttribute (strRailWearTQILayer, strRailWearTQICategory, strAttrHeadLossLeftMax)
+
+
+    end:
+  </Commands>
+
+  <Function logged = "false">
+    <Name>subF-RoundAttributeValue</Name>
+    <Description>Set "Survey Name" and "Survey Date" attributes, and nationally channel name</Description>
+
+    <Parameter>
+      <Name>estInput</Name>
+      <Type>eventSet</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strAttributeToRound</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Result>
+      <Name>estResult</Name>
+      <Type>eventSet</Type>
+    </Result>
+
+    <Commands>
+      strRoundValue = string.Format ("round ('%s'* 100.0)/100.0 ", strAttributeToRound)
+      forRoundValue = formula.Create (strRoundValue)
+      estResult = event.CalculateAttribute (estInput, forRoundValue, strAttributeToRound, "double")
+
+    </Commands>
+  </Function>
+
+  <Function logged = "false">
+    <Name>subF-SetEventsSurveyAndDates</Name>
+    <Description>Set "Survey Name" and "Survey Date" attributes, and nationally channel name</Description>
+
+    <Parameter>
+      <Name>estInput</Name>
+      <Type>eventSet</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strRawSurvey</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>datSurvey</Name>
+      <Type>date</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>lstRetainAttributes</Name>
+      <Type>list</Type>
+    </Parameter>
+
+    <Parameter required = "false">
+      <Name>strChannel</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Result>
+      <Name>estResult</Name>
+      <Type>eventSet</Type>
+    </Result>
+
+    <Commands>
+      strSurveyNameAttrName = string.Append ("Survey Name")
+      strSurveyDateAttrName = string.Append ("Survey Date")
+      strChannelAttrName = string.Append ("Channel")
+
+      estResult = event.SetAttribute (estInput, strSurveyNameAttrName, strRawSurvey)
+      estResult = event.SetAttribute (estResult, strSurveyDateAttrName, datSurvey)
+      estResult = event.SetDatesToAttributes (estResult, strSurveyDateAttrName, strSurveyDateAttrName)
+      estResult = event.RetainAttributes (estResult, lstRetainAttributes)
+      control.GoToIf("$strChannel==null", "end")
+      estResult = event.SetAttribute (estResult, strChannelAttrName, strChannel)
+      end:
+
+    </Commands>
+  </Function>
+
+
+  <Function logged = "false">
+    <Name>subF-GetAttribute</Name>
+    <Description></Description>
+
+    <Parameter>
+      <Name>lstAttributes</Name>
+      <Type>list</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strAttributeName</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Result>
+      <Name>strAttributeName</Name>
+      <Type>string</Type>
+    </Result>
+
+    <Commands>
+      collection.ListAdd (lstAttributes, strAttributeName)
+    </Commands>
+  </Function>
+</Script>

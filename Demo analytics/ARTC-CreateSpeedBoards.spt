@@ -1,0 +1,41 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Script>
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+  <Description>Creates Speed Boards</Description>
+
+  <Commands>
+
+    console.ShowValue ("$Copyright: (c) 2018 Bentley Systems, Incorporated. All rights reserved.","")
+    script.SetLogLevel ("error")
+
+    strFreightSpeedAttr  = util.Assign ("Max Speed - Freight")
+    strPassengerSpeedAttr  = util.Assign ("Max Speed - Passenger")
+    strLabel  = util.Assign ("Label")
+
+    strSpeedCategory = util.Assign ("Speed Board")
+    strSpeedLayerName = util.Assign ("Speed Boards")
+    uniMetre = unit.GetUnit ("Metric", "metre")
+
+    estSpeed115a = event.CreateRangeEventsFromMarkers ("10003", "300", 0, "302", 202.0, uniMetre, "745010")
+    estSpeed115b = event.CreateRangeEventsFromMarkers ("10003", "302", 666.0, "310", 1, uniMetre, "745010")
+    estSpeed115 = event.Add (estSpeed115a, estSpeed115b)
+    estSpeed115 = event.SetAttribute (estSpeed115, strFreightSpeedAttr, 115)
+    estSpeed115 = event.SetAttribute (estSpeed115, strPassengerSpeedAttr, 160)
+    estSpeed115 = event.SetAttribute (estSpeed115, strLabel, "115/160")
+
+    estSpeed110 = event.CreateRangeEventsFromMarkers ("10003", "302", 202.0, "302", 666.0, uniMetre, "745010")
+    estSpeed110 = event.SetAttribute (estSpeed110, strFreightSpeedAttr, 110)
+    estSpeed110 = event.SetAttribute (estSpeed110, strPassengerSpeedAttr, 125)
+    estSpeed110 = event.SetAttribute (estSpeed110, strLabel, "110/125")
+
+    estSpeed = event.Add (estSpeed115, estSpeed110)
+    estSpeed = event.Merge (estSpeed)
+    event.DeleteByCategory (strSpeedCategory)
+    event.Save (estSpeed, strSpeedCategory, strSpeedCategory)
+    layer.CreateEventLayer (strSpeedLayerName, strSpeedCategory, strSpeedCategory)
+
+
+  </Commands>
+</Script>

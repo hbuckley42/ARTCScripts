@@ -1,0 +1,132 @@
+<?xml version = "1.0" encoding = "ISO-8859-1" ?>
+
+<Function logged = "false">
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+  <Description>
+    F- PredictLimitExceedanceDates is a concrete implementation of event.PredictFunctionValues command.
+    It generates events with attribute (defined as strLimitExceedDateAttr) holding the calculated
+    predicted date when each limit will be exceeded and strLimitValueAttr holding the related limit value.
+    The number pre-computed functions mapped to each ordinate attribute must be the same as the number
+    of events in the supplied mask event set (one function per one mask event and the related ordinate attribute).
+    The start and end dates of the corresponding output event will be set to strLimitExceedDateAttr date
+    and only events with the date in range [current date, current date + 5 years] will be returned.
+
+    *** Parameters ***
+    - estMask - A mask event to be used calculate output event set. It should be the same mask
+    which was used to calculate fit functions give as mapFitFunctions
+    - mapFitFunctions - A map of the numeric ordinate attribute names mapped to the related computed
+    best fit functions over time.
+    - lstLimitValues - A list of numeric values representing the limits the predict exceedance dates to be calculated for
+    - strLimitExceedDateAttr - The name of the attribute to hold the calculated exceedance dates.
+    - strLimitValueAttr - The name of the attribute to hold the limit that has been exceeded on the corresponding event date.
+
+    *** Returns ***
+    A map of the ordinate attribute names mapped to the event sets calculated from the give corresponding fit functions.
+
+  </Description>
+
+  <Parameter>
+    <Name>estMask</Name>
+    <Type>eventSet</Type>
+  </Parameter>
+
+  <Parameter>
+    <Name>mapFitFunctions</Name>
+    <Type>map</Type>
+  </Parameter>
+
+  <Parameter>
+    <Name>lstLimitValues</Name>
+    <Type>list</Type>
+  </Parameter>
+
+  <Parameter>
+    <Name>strLimitExceedDateAttr</Name>
+    <Type>string</Type>
+  </Parameter>
+
+  <Parameter>
+    <Name>strLimitValueAttr</Name>
+    <Type>string</Type>
+  </Parameter>
+
+  <Result>
+    <Name>mapOrdinateAttrToPredictEvents</Name>
+    <Type>map</Type>
+  </Result>
+
+  <Commands>
+    lstRetainAttributes = collection.ListCreate (strLimitValueAttr, strLimitExceedDateAttr)
+
+    forToday = formula.Create ("CurrentDate")
+    datToday = formula.Evaluate (forToday,,"date")
+    forTodayPlus5Years = formula.Create ("AddYears(CurrentDate, 5)")
+    datTodayPlus5Years = formula.Evaluate (forTodayPlus5Years,,"date")
+
+    filRange0to5 = filter.CreateRangeFilter (datToday, datTodayPlus5Years)
+    atrFilRange0to5 = filter.CreateAttributeFilter (strLimitExceedDateAttr, filRange0to5)
+    evtFilRange0to5 = filter.CreateEventValueFilter (atrFilRange0to5)
+
+    intLimitValuesCount = collection.Size(lstLimitValues)
+    lstLimitNames = script.Call("subF-CreateNamesList", intLimitValuesCount, "Predict")
+    lstLimits = script.Call("F-CreateLimits.spf", lstLimitValues, lstLimitNames, "gt")
+
+    intLoopIndex = util.Assign(0)
+    forNextIndex = formula.Create("$intLoopIndex + 1")
+    lstOrdinateAttributes = collection.MapKeys (mapFitFunctions)
+    intOrdinateCount = collection.Size(lstOrdinateAttributes)
+    mapOrdinateAttrToPredictEvents = collection.MapCreate ()
+
+    loopBegin:
+    control.GoToIf("$intLoopIndex == $intOrdinateCount", "loopEnd")
+    strOrdinateAttribute = collection.ListGet(lstOrdinateAttributes, intLoopIndex)
+    lstFitFunctions = collection.MapGet (mapFitFunctions, strOrdinateAttribute)
+    estPredict = event.PredictFunctionValues (estMask, lstFitFunctions, strLimitExceedDateAttr, strLimitValueAttr, lstLimits)
+    estPredict = event.Filter (estPredict, evtFilRange0to5)
+    estPredict = event.SetDatesToAttributes (estPredict, strLimitExceedDateAttr, strLimitExceedDateAttr)
+    estPredict = event.RetainAttributes (estPredict, lstRetainAttributes)
+    collection.MapPut (mapOrdinateAttrToPredictEvents, strOrdinateAttribute, estPredict)
+
+    intLoopIndex = formula.Evaluate(forNextIndex, , "integer")
+    control.GoTo("loopBegin")
+    loopEnd:
+
+
+  </Commands>
+
+  <Function logged = "false">
+    <Name>subF-CreateNamesList</Name>
+    <Description>A helper sub function which generates a list of a given size populated with of string values defined as strLimitName </Description>
+
+    <Parameter>
+      <Name>intListSize</Name>
+      <Type>integer</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strLimitName</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Result>
+      <Name>lstNames</Name>
+      <Type>list</Type>
+    </Result>
+
+    <Commands>
+
+      intLoopIndex = util.Assign(0)
+      forNextIndex = formula.Create("$intLoopIndex + 1")
+      lstNames = collection.ListCreate ()
+
+      loopBegin:
+      control.GoToIf("$intLoopIndex == $intListSize", "loopEnd")
+      collection.ListAdd (lstNames, strLimitName)
+      intLoopIndex = formula.Evaluate(forNextIndex, , "integer")
+      control.GoTo("loopBegin")
+      loopEnd:
+
+    </Commands>
+  </Function>
+</Function>

@@ -1,0 +1,84 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Script>
+  <Description>Imports observations for a run</Description>
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter required = "true">
+    <Name>strUsername</Name>
+    <Type>string</Type>
+    <Source>user</Source>
+    <Default>DataAdmin</Default>
+    <Alias>User File Owner</Alias>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strDataFile</Name>
+    <Type>string</Type>
+    <Alias>File Name:</Alias>
+    <Source>userFile</Source>
+    <Default>import-data/observation/TrackObservation.*</Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strSuccessFolderName</Name>
+    <Type>string</Type>
+    <Alias>Success Folder Name:</Alias>
+    <Source>userFolder</Source>
+    <Default>processed-data/observation</Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strFailedFolderName</Name>
+    <Type>string</Type>
+    <Alias>Failed Folder Name:</Alias>
+    <Source>userFolder</Source>
+    <Default>failed-data/observation</Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+  </Parameter>
+
+  <Commands>
+
+    script.SetLogLevel ("info")
+
+    <!-- Check for name including wildcards, indicating no matching files found -->
+
+    bolHasWildcards = script.Call ("BPS-F-CheckForWildcards.spf", strDataFile)
+    control.GoToIf ("$bolHasWildcards", "End")
+
+    <!-- Validate filename, filename: TrackObservation_(AK|ICW|Ultrasonic)_runId.csv, with optional path -->
+
+    strFilename = string.ReplaceRegex (strDataFile, "^.*(\\\\|/)", "")
+    strCheckFilename = string.ReplaceRegex (strFilename, "^TrackObservation_(AK|ICW|Ultrasonic)_[0-9]+[.]csv$", "")
+    test.FailIfNotEqual (strCheckFilename, "", "", "Filename is an invalid format")
+
+     <!-- Get event category and run id from filename -->
+
+    strEventCategory = string.ReplaceRegex (strFilename, "^TrackObservation_(AK|ICW|Ultrasonic)_[0-9]+[.]csv$", "$1 Observation")
+    strRunId = string.ReplaceRegex (strFilename, "^.+_([0-9]+)[.]csv$", "$1")
+
+    <!-- Move import file to success or failed folder, depending on script outcome -->
+
+    script.MoveFileOnCompletion (strUsername, strDataFile, strSuccessFolderName, strFailedFolderName)
+    uflDataFile = userfile.GetUserFile (strUsername, strDataFile)
+
+    <!-- DLD is ARTC-Event_<eventCategory>.dld -->
+
+    strDLD = string.Append ("ARTC-Event_", strEventCategory, ".dld")
+
+    <!-- Delete any existing events from this run and import the new events -->
+
+    iRunId = util.ParseInt (strRunId)
+    event.DeleteByAttribute (strEventCategory, "Track Test Run Id", iRunId)
+
+    iNumImported = event.ImportFile (uflDataFile, , strDLD)
+
+    strMessage = string.Format ("Imported %d %s records for run %s", iNumImported, strEventCategory, strRunId)
+    console.ShowValue (strMessage, "")
+
+  </Commands>
+
+</Script>

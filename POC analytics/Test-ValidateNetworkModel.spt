@@ -1,0 +1,39 @@
+<?xml version = "1.0" encoding = "utf-8" ?>
+
+<Script>
+  <Description>Test Network Model</Description>
+  <Version>1.1</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Commands>
+
+	uniMetre = unit.GetUnit ("Metric", "metre")
+
+    trv19068 = traversal.Create ("N40,290.0+0,10026,291.0+0,19068,294.0+0,10026,295.0+0" , uniMetre)
+	console.ShowValue ("trv19068", trv19068)
+
+    trv19051 = traversal.Create ("N40,303.0+0,10026,304.0+0,19051,307.0+0,10026,308.0+0" , uniMetre)
+	console.ShowValue ("trv19051", trv19051)
+
+    trv19061 = traversal.Create ("N40,314.0+0,10026,315.0+0,19061,318.0+0,10026,319.0+0" , uniMetre)
+	console.ShowValue ("trv19061", trv19061)
+
+    trv14021 = traversal.Create ("N40,341.0+0,10026,342.0+0,14021,345.0+0,10026,346.0+0" , uniMetre)
+	console.ShowValue ("trv14021", trv14021)
+
+    trv15032 = traversal.Create ("N40,368.0+0,10026,369.0+0,15032,372.0+0,10026,373.0+0" , uniMetre)
+	console.ShowValue ("trv15032", trv15032)
+
+    trv12980 = traversal.Create ("N40,381.0+0,10026,382.0+0,12980,387.0+0,10026,388.0+0" , uniMetre)
+	console.ShowValue ("trv12980", trv12980)
+
+    trv19050 = traversal.Create ("N40,408.0+0,10026,409.0+0,19050,412.0+0,10026,413.0+0" , uniMetre)
+	console.ShowValue ("trv19050", trv19050)
+
+    trv19027 = traversal.Create ("N40,419.0+0,10026,420.0+0,19027,423.0+0,10026,424.0+0" , uniMetre)
+	console.ShowValue ("trv19027", trv19027)
+
+
+  </Commands>
+
+</Script>

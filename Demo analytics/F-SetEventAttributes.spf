@@ -1,0 +1,62 @@
+<?xml version = "1.0" encoding = "utf-8" ?>
+
+<Function logged = "false">
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Description>
+    F-SetEventAttributes is a concrete implementation of event.SetAttribute command.
+    For each event in an event set specified as estEvents, this function sets the values
+    for the attributes from a list given as lstAttributeNames. The size of attribute name
+    list must be the same as the size of attribute values list, i.e. one name per one value.
+
+    *** Parameters ***
+    - estEvents - A set of events attribute values
+    - lstAttributeValues - A list of values to be set for the corresponding attribute names.
+    - lstAttributeNames - A list of attribute names to hold the given values
+
+    *** Returns ***
+    A set of events containing copies of the events in the supplied event set, but with
+    the specified attributes set to the supplied values. Existing values of the listed
+    attributes will be overwritten
+
+  </Description>
+
+  <Parameter>
+    <Name>estEvents</Name>
+    <Type>eventSet</Type>
+  </Parameter>
+
+  <Parameter>
+    <Name>lstAttributeValues</Name>
+    <Type>list</Type>
+  </Parameter>
+
+  <Parameter>
+    <Name>lstAttributeNames</Name>
+    <Type>list</Type>
+  </Parameter>
+
+  <Result>
+    <Name>estEvents</Name>
+    <Type>eventSet</Type>
+  </Result>
+
+  <Commands>
+
+    intNumberAttributesToTrend = collection.Size(lstAttributeValues)
+    intIndex = util.Assign(0)
+    forNextIndex = formula.Create("$intIndex + 1")
+
+    loopBegin:
+    control.GoToIf("$intIndex == $intNumberAttributesToTrend", "loopEnd")
+    strLevelValue = collection.ListGet(lstAttributeValues, intIndex)
+    strAttributeName = collection.ListGet(lstAttributeNames, intIndex)
+    estEvents = event.SetAttribute (estEvents, strAttributeName, strLevelValue)
+    intIndex = formula.Evaluate(forNextIndex, , "integer")
+    control.GoTo("loopBegin")
+
+    loopEnd:
+
+  </Commands>
+</Function>

@@ -1,0 +1,112 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Script>
+  <Version>1.0</Version>
+  <Description>JoinShortEvents defect</Description>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter required = "True">
+    <Name>strCorridor</Name>
+    <Type>string</Type>
+    <Source>corridor</Source>
+    <Alias>Corridor</Alias>
+  </Parameter>
+
+  <Parameter required = "True">
+    <Name>strMarker</Name>
+    <Type>string</Type>
+    <Source>marker</Source>
+    <Alias>Marker</Alias>
+  </Parameter>
+
+  <Commands>
+
+	uniMetre = unit.GetUnit ("Metric", "metre")
+	
+	forToday = formula.Create ("CurrentDate")
+	datToday = formula.Evaluate (forToday, , "date")
+
+	estTracks = event.CreateRangeEventsFromMarkers (strCorridor, strMarker, 0.0, strMarker, 45.0, uniMetre, )
+	estTracks = event.SetAttributeToTrackNames (estTracks, "Track")
+	estTracks = event.MergeWithinDistance (estTracks, 1.0, uniMetre)
+	estTracks = event.RemoveAllAttributes (estTracks)
+
+	estTest = event.CreateUniformLengthRangeEvents (strCorridor, strMarker, 0.0, strMarker, 40.0, uniMetre, , 20.0, uniMetre)
+	estTrackEnds = event.Subtract (estTracks, estTest)
+
+	estTest = event.Add (estTest, estTrackEnds)
+	estTest = event.SetAttribute (estTest, "TEMP-DATE", datToday)
+	estTest = event.SetDatesToAttributes (estTest, "TEMP-DATE", "TEMP-DATE")
+	estTest = event.RemoveAttribute (estTest, "TEMP-DATE")
+
+console.ShowValue ("estTest", estTest)
+console.ShowValue ("estTrackEnds", estTrackEnds)
+
+	<!-- Join Short Events -->
+
+    estTest1 = event.JoinShortEvents (estTest, 2.0, uniMetre, "Dominant")
+
+    estTest2 = script.Call ("subF-JoinShortEvents", estTest, 2.0, uniMetre)
+
+console.ShowValue ("estTest1", estTest1)
+console.ShowValue ("estTest2", estTest2)
+
+  </Commands>
+
+<Function logged = "false">
+  <Name>subF-JoinShortEvents</Name>
+
+  <Parameter required = "true">
+    <Name>estOriginal</Name>
+    <Type>eventSet</Type>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>dblLength</Name>
+    <Type>double</Type>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>uniUnit</Name>
+    <Type>unit</Type>
+  </Parameter>
+
+  <Result>
+    <Name>estResult</Name>
+    <Type>eventSet</Type>
+  </Result>
+
+  <Commands>
+
+	estResult = event.SetAttributeToLength (estOriginal, "TEMP-LENGTH", uniUnit)
+
+	filLTMinSize = filter.CreateLessThanFilter (dblLength)
+	atrFIlLengthLTMinSize = filter.CreateAttributeFilter ("TEMP-LENGTH", filLTMinSize)
+	evtFIlLengthLTMinSize = filter.CreateEventValueFilter (atrFIlLengthLTMinSize)
+
+	atrFIlLengthGEMinSize = filter.CreateNotFilter (atrFIlLengthLTMinSize)
+	evtFIlLengthGEMinSize = filter.CreateEventValueFilter (atrFIlLengthGEMinSize)
+	
+	estShortSegments = event.Filter (estResult, evtFIlLengthLTMinSize)
+	estLongSegments = event.Filter (estResult, evtFIlLengthGEMinSize)
+
+	estShortSegments = event.RemoveAttribute (estShortSegments, "TEMP-LENGTH")
+	estLongSegments = event.RemoveAttribute (estLongSegments, "TEMP-LENGTH")
+
+	estShortSegments = event.SetAttributesToLocations (estShortSegments, "TEMP-MARKER", "TEMP-OFFSET", , , uniUnit, 1)
+	estLongSegments = event.SetAttributesToLocations (estLongSegments, , , "TEMP-MARKER", "TEMP-OFFSET", uniUnit, 1) 
+
+	estResult = event.Add (estShortSegments, estLongSegments)
+	estResult = event.MergeWithinDistance (estResult, 1.0, uniUnit)
+
+	estResult = event.SetAttributeToLength (estResult, "TEMP-LENGTH", uniUnit)
+	estResult = event.Filter (estResult, evtFIlLengthGEMinSize)
+
+	lisTempAttributes = collection.ListCreate ("TEMP-LENGTH", "TEMP-MARKER", "TEMP-OFFSET")
+	estResult = event.RemoveAttributes (estResult, lisTempAttributes)
+
+  </Commands>
+
+</Function>
+
+</Script>

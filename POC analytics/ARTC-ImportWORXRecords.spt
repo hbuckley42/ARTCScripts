@@ -1,0 +1,75 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Script>
+  <Description>Imports WORX records</Description>
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter required = "true">
+    <Name>strUsername</Name>
+    <Type>string</Type>
+    <Source>user</Source>
+    <Default>DataAdmin</Default>
+    <Alias>User File Owner</Alias>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strDataFile</Name>
+    <Type>string</Type>
+    <Alias>File Name:</Alias>
+    <Source>userFile</Source>
+    <Default>import-data/event/WORX.*</Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strSuccessFolderName</Name>
+    <Type>string</Type>
+    <Alias>Success Folder Name:</Alias>
+    <Source>userFolder</Source>
+    <Default>processed-data/event</Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strFailedFolderName</Name>
+    <Type>string</Type>
+    <Alias>Failed Folder Name:</Alias>
+    <Source>userFolder</Source>
+    <Default>failed-data/event</Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+  </Parameter>
+
+  <Commands>
+
+    script.SetLogLevel ("info")
+
+    <!-- Check for name including wildcards, indicating no matching files found -->
+
+    bolHasWildcards = script.Call ("BPS-F-CheckForWildcards.spf", strDataFile)
+    control.GoToIf ("$bolHasWildcards", "End")
+
+    <!-- Validate filename, filename: WORX_<yyyymmdd>.csv, with optional path -->
+
+    strFilename = string.ReplaceRegex (strDataFile, "^.*(\\\\|/)", "")
+    strCheckFilename = string.ReplaceRegex (strFilename, "^WORX_[0-9]{8}[.]csv$", "")
+    test.FailIfNotEqual (strCheckFilename, "", "", "Filename is an invalid format")
+
+    <!-- Move import file to success or failed folder, depending on script outcome -->
+
+    script.MoveFileOnCompletion (strUsername, strDataFile, strSuccessFolderName, strFailedFolderName)
+
+    <!-- DLD is ARTC-Event_WORX.dld -->
+
+    strDLD = string.Append ("ARTC-Event_WORX.dld")
+
+    <!-- Import the WORX records -->
+
+    uflDataFile = userfile.GetUserFile (strUsername, strDataFile)
+    iNumImported = event.ImportFile (uflDataFile, , strDLD)
+
+    strMessage = string.Format ("Imported %d WORX records", iNumImported)
+    console.ShowValue (strMessage, "")
+
+  </Commands>
+</Script>

@@ -1,0 +1,104 @@
+<?xml version = "1.0" encoding = "utf-8" ?>
+
+<Script>
+
+  <Description>This script creates Create Uniform Length Range Events </Description>
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter>
+    <Name>strCorridor</Name>
+    <Type>string</Type>
+    <Source>corridor</Source>
+    <Alias>Line: </Alias>
+    <Default>10003</Default>
+  </Parameter>
+
+  <Parameter>
+    <Name>dblStraightSegmentLength</Name>
+    <Type>double</Type>
+    <Alias>Straight Segment Length (metres):</Alias>
+    <Default>200.0</Default>
+  </Parameter>
+
+  <Commands>
+    <!--
+    ##################################################################################################
+      Output:
+      Extent Category:  Segmentation
+      Event Types:      intSegmentLength metre
+    ################################################################################################## -->
+
+    strSegmentCategoryName = util.Assign ("Segment")
+    strSegmentType = string.Format ("Compound")
+    
+    strCurveComponentCategory = util.Assign ("Curve Component")
+    strCurveComponentArc = util.Assign ("Arc")
+    strCurveComponentTransition = util.Assign ("Transition")
+    strCurveComponentStraight = util.Assign ("Straight")
+    
+    strSegmentArc = util.Assign ("Arc")
+    strSegmentTransition = util.Assign ("Transition")
+    strSegmentStraight = util.Assign ("Straight")
+    strSegmentArcAndTransition = util.Assign ("Arc and Transition")
+
+    lstOutAttributes = collection.ListCreate ()
+    strAttrSegment = script.Call("subF-GetAttribute", lstOutAttributes, "Segment")
+    strAttrSegmentID = script.Call("subF-GetAttribute", lstOutAttributes, "Segment ID")
+    strAttrCurveID = script.Call("subF-GetAttribute", lstOutAttributes, "Curve ID")
+    strAttrRadius = script.Call("subF-GetAttribute", lstOutAttributes, "Radius")
+    strAttrVersine = script.Call("subF-GetAttribute", lstOutAttributes, "Versine")
+    strAttrCurveSide = script.Call("subF-GetAttribute", lstOutAttributes, "Curve Side")
+
+    uniMetre = unit.GetUnit ("Metric", "metre")
+
+    estCurveArc = event.LoadByCorridor (strCurveComponentCategory, strCurveComponentArc, , , strCorridor)
+    estCurveTransition = event.LoadByCorridor (strCurveComponentCategory, strCurveComponentTransition, , , strCorridor)
+    estArcAndTransition = event.Add (estCurveArc, estCurveTransition)
+    estCurveArc = event.Dilate (estCurveArc, 1, uniMetre)
+    estArcAndTransition = event.Join (estArcAndTransition, estCurveArc, "Maximum")
+
+    estCurveStraight = event.LoadByCorridor (strCurveComponentCategory, strCurveComponentStraight, , , strCorridor)
+    estCurveStraight = event.RemoveAttribute (estCurveStraight, strAttrCurveID)
+
+    estArcAndTransition = event.SetAttribute (estArcAndTransition, strAttrSegment, strSegmentArcAndTransition)
+    estCurveTransition = event.SetAttribute (estCurveTransition, strAttrSegment, strSegmentTransition)
+    estCurveStraight = event.SetAttribute (estCurveStraight, strAttrSegment, strSegmentStraight)
+
+    estCurveStraight = event.Split (estCurveStraight, dblStraightSegmentLength, uniMetre, "EqualLengthSeparate")
+    estSegment = event.Add (estArcAndTransition, estCurveStraight)
+    estSegment = event.SetAttributeToUniqueId (estSegment, strAttrSegmentID)
+    estSegment = event.RetainAttributes (estSegment, lstOutAttributes)
+
+    event.DeleteByCorridor (strSegmentCategoryName, strSegmentType, , , strCorridor)
+    event.Save (estSegment, strSegmentCategoryName, strSegmentType,)
+
+    strSegmentsLayer = util.Assign ("Segments")
+    layer.CreateEventLayer (strSegmentsLayer, strSegmentCategoryName, strSegmentType)
+
+  </Commands>
+
+  <Function logged = "false">
+    <Name>subF-GetAttribute</Name>
+    <Description></Description>
+
+    <Parameter>
+      <Name>lstAttributes</Name>
+      <Type>list</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strAttributeName</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Result>
+      <Name>strAttributeName</Name>
+      <Type>string</Type>
+    </Result>
+
+    <Commands>
+      collection.ListAdd (lstAttributes, strAttributeName)
+    </Commands>
+  </Function>
+</Script>

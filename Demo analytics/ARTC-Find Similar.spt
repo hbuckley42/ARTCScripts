@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<Script>
+  <Description>Find areas of the network that match user specified criteria.
+  Foundation:Ballasted Track,Concrete Slab Track,Floating Slab Track
+  Structure: AT-Grade,Tunnel,Underground,Viaduct
+  </Description>
+
+  <Parameter>
+    <Name>strLine</Name>
+    <Type>string</Type>
+    <Alias>Line:</Alias>
+	<Source>corridor</Source>
+	<Default>10003</Default>  
+  </Parameter>
+  
+  <Parameter>
+    <Name>dblTopTQI</Name>
+    <Type>double</Type>
+    <Alias>Top TQI SD Level:</Alias>
+	<Default>0.0</Default>
+  </Parameter>
+  
+  <Parameter>
+    <Name>dblTopTQITolerance</Name>
+    <Type>double</Type>
+    <Alias>Top TQI Tolerance (+/-):</Alias>
+	<Default>1000.0</Default>
+  </Parameter>
+  
+  <Parameter>
+    <Name>dblRailWear</Name>
+    <Type>double</Type>
+    <Alias>Top Rail Wear (left):</Alias>
+	<Default>0.0</Default>
+  </Parameter>
+  
+  <Parameter>
+    <Name>dblRailWearTolerance</Name>
+    <Type>double</Type>
+    <Alias>Rail Wear Tolerance (+/-):</Alias>
+	<Default>1000.0</Default>
+  </Parameter>
+  
+  <Parameter>
+    <Name>strCategory</Name>
+    <Type>string</Type>
+	<Source>extentCategory</Source>
+    <Alias>Additional Attribute Category 1:</Alias>
+	<Default>Curve Component</Default>
+  </Parameter> 
+  
+  <Parameter>
+    <Name>strType</Name>
+    <Type>string</Type>
+	<Source>extentType</Source>
+    <Alias>Additional Attribute Type 1:</Alias>
+	<AssociatedParameter>strCategory</AssociatedParameter>
+	<Default>Transition</Default>
+  </Parameter> 
+  
+  <Parameter>
+    <Name>strCategory2</Name>
+    <Type>string</Type>
+	<Source>extentCategory</Source>
+     <Alias>Additional Attribute Category 2:</Alias>
+	<Default>Speed Restriction</Default>
+  </Parameter> 
+  
+  <Parameter>
+    <Name>strType2</Name>
+    <Type>string</Type>
+	<Source>extentType</Source>
+    <Alias>Additional Attribute Type 2:</Alias>
+	<AssociatedParameter>strCategory2</AssociatedParameter>
+	<Default>Speed Restriction</Default>
+  </Parameter> 
+
+  <Parameter>
+    <Name>dblProximity2</Name>
+    <Type>double</Type>
+    <Alias>Proximity for category 2 (m):</Alias>
+	<Default>20.0</Default>
+  </Parameter>
+  
+  <Parameter>
+    <Name>strMonths</Name>
+    <Type>string</Type>
+    <Alias>Months back to search:</Alias>
+	<Default>24</Default>
+  </Parameter>
+  
+  <Commands>
+
+    console.ShowValue ("Script Version:", 0.1)
+    console.ShowValue ("$Copyright: (c) 2019 Bentley Systems, Incorporated. All rights reserved.", "")
+
+    <!--
+    ##################################################################################################
+      Output:
+
+      Survey:           Renamed, PRO- prefix replaced with IMP- 
+						ALN- survey deleted
+    ##################################################################################################
+    -->
+
+    <!-- Calculate the ranges to search for -->
+
+	uniMetre = unit.GetUnit ("Metric", "metre")
+	
+	strUser = security.GetUsername()
+
+	strTarget = string.Append(strUser," - similar")
+	
+ 	formula = formula.Create ("CurrentDate")
+	datToday = formula.Evaluate (formula,,"date")
+	
+	strMonthsBack = string.Append("AddMonths(CurrentDate,-",strMonths,")")
+	console.ShowValue("strMonthsBack:",strMonthsBack)
+	formula = formula.Create (strMonthsBack)
+	datSixMonths = formula.Evaluate (formula,,"date")
+	
+	mapParameters = collection.MapCreate()
+	collection.MapPut(mapParameters,"dblTopTQI",dblTopTQI)
+	collection.MapPut(mapParameters,"dblTopTQITolerance",dblTopTQITolerance)
+	collection.MapPut(mapParameters,"dblRailWear",dblRailWear)
+	collection.MapPut(mapParameters,"dblRailWearTolerance",dblRailWearTolerance)
+		
+	formula = formula.Create ("'dblTopTQI'-'dblTopTQITolerance'")
+	dblTopTQIMin = formula.Evaluate (formula,mapParameters,"double")
+		
+	formula = formula.Create ("'dblTopTQI'+'dblTopTQITolerance'")
+	dblTopTQIMax = formula.Evaluate (formula,mapParameters,"double")
+	
+	formula = formula.Create ("'dblRailWear'-'dblRailWearTolerance'")
+	dblRailWearMin = formula.Evaluate (formula,mapParameters,"double")
+		
+	formula = formula.Create ("'dblRailWear'+'dblRailWearTolerance'")
+	dblRailWearMax = formula.Evaluate (formula,mapParameters,"double")
+
+    <!-- Initialise -->
+		
+ 	estMeanTopTQI = event.LoadByCorridor("Track Geometry SD","Track Geometry SD",datSixMonths,,strLine)
+	estMeanTopTQI = event.StackMaximum(estMeanTopTQI,"Survey Date")
+	
+	filMin = filter.CreateGreaterThanFilter (dblTopTQIMin)
+	filAttrMin = filter.CreateAttributeFilter ("SD Level Worst Surface 20", filMin)
+	filValAttrMin = filter.CreateEventValueFilter (filAttrMin)
+	filMax = filter.CreateLessThanFilter (dblTopTQIMax)
+	filAttrMax = filter.CreateAttributeFilter ("SD Level Worst Surface 20", filMax)
+	filValAttrMax = filter.CreateEventValueFilter (filAttrMax)
+	filValAttr = filter.CreateAndFilter(filValAttrMin,filValAttrMax)
+	
+	estMeanTopTQI = event.Filter (estMeanTopTQI, filValAttr)
+		
+	estWearTQI = event.LoadByCorridor("Rail Wear TQI","Rail Wear TQI (200 metre segment)",datSixMonths,,strLine)
+	estWearTQI = event.StackMaximum(estWearTQI,"Survey Date")
+
+	filMin = filter.CreateGreaterThanFilter (dblRailWearMin)
+	filAttrMin = filter.CreateAttributeFilter ("Head Loss Left 90th Percentile", filMin)
+	filValAttrMin = filter.CreateEventValueFilter (filAttrMin)
+	filMax = filter.CreateLessThanFilter (dblRailWearMax)
+	filAttrMax = filter.CreateAttributeFilter ("Head Loss Left 90th Percentile", filMax)
+	filValAttrMax = filter.CreateEventValueFilter (filAttrMax)
+	filValAttr = filter.CreateAndFilter(filValAttrMin,filValAttrMax)
+ 	
+	estWearTQI = event.Filter (estWearTQI, filValAttr)
+
+	estResult = event.LoadByCorridor(strCategory,strType,datSixMonths,,strLine)
+	estResult2 = event.LoadByCorridor(strCategory2,strType2,datSixMonths,,strLine)
+	estResult2 = event.Dilate(estResult2,dblProximity2,uniMetre)
+	
+	estResult = event.Intersect(estResult,estResult2)
+	estResult = event.Intersect(estResult,estMeanTopTQI)
+	estResult = event.Intersect(estResult,estWearTQI)
+	
+	estResult = event.SetAttribute(estResult,"Search Top TQI",dblTopTQI)
+	estResult = event.SetAttribute(estResult,"Search Top TQI Tolerance",dblTopTQITolerance)
+	estResult = event.SetAttribute(estResult,"Search Rail Wear",dblRailWear)
+	estResult = event.SetAttribute(estResult,"Search Rail Wear Tolerance",dblRailWearTolerance)
+	estResult = event.SetAttribute(estResult,"Search Category 1",strCategory)
+	estResult = event.SetAttribute(estResult,"Search Type 1",strType)
+	estResult = event.SetAttribute(estResult,"Search Category 2",strCategory2)
+	estResult = event.SetAttribute(estResult,"Search Type 2",strType2)
+	estResult = event.SetAttribute(estResult,"Search Tolerance",dblProximity2)
+	
+	event.DeleteByCorridor(strTarget,,,strLine)
+	event.Save(estResult, strTarget, strTarget)
+	
+	layer.CreateEventLayer(strTarget, strTarget, strTarget)
+	
+  </Commands>
+
+</Script>

@@ -1,0 +1,60 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Function logged = "false">
+  <Version>1.0</Version>
+  <Description>Aligns channels from a survey</Description>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter required = "true">
+    <Name>mapChannels</Name>
+    <Type>map</Type>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>srmDisplacement</Name>
+    <Type>stream</Type>
+  </Parameter>
+
+  <Result>
+    <Name>mapAlignedChannels</Name>
+    <Type>map</Type>
+  </Result>
+
+  <Commands>
+
+    <!--
+    ##################################################################################################
+
+    Parameters:
+      mapChannels:      Map of channels to be algined, key is channel name, value is the channel
+      srmDisplacement:  Displacement stream to be applied to each channel
+
+    Result:
+      map:              Original map of channels, with each channel replaced with the aligned channel.
+                        Will be empty if an empty map of channels supplied.
+
+    ##################################################################################################
+    -->
+
+    forIndexDecrement = formula.Create ("$intIndex - 1")
+
+    <!-- Initialise map of aligned channels, exit if no channels to align -->
+
+    mapAlignedChannels = collection.MapCreate ()
+    test.ExitIfNullOrEmpty (mapChannels, "", "")
+
+    <!-- Loop through the list of channels aligning each using the supplied displacement stream -->
+
+    lisChannelNames = collection.MapKeys (mapChannels)
+    intIndex = collection.Size (lisChannelNames)
+    BeginLoop:
+        intIndex = formula.Evaluate (forIndexDecrement, , "integer")
+        strChannelName = collection.ListGet (lisChannelNames, intIndex)
+        srmChannel = collection.MapGet (mapChannels, strChannelName)
+        srmAlignedChannel = stream.Align (srmChannel, srmDisplacement)
+        collection.MapPut (mapAlignedChannels, strChannelName, srmAlignedChannel)
+        control.GoToIf ("$intIndex > 0", "BeginLoop")
+
+  </Commands>
+
+</Function>

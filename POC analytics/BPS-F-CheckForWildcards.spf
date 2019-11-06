@@ -1,0 +1,31 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Function logged = "false">
+  <Version>1.0</Version>
+  <Description>Checks if filename contains wildcards</Description>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter required = "true">
+    <Name>strDataFile</Name>
+    <Type>string</Type>
+  </Parameter>
+
+  <Result>
+    <Name>bolHasWildcards</Name>
+    <Type>boolean</Type>
+  </Result>
+
+  <Commands>
+
+    strMessage = string.Append ("No files matching ", strDataFile, " found.")
+
+    <!-- Checks for matching files, if the filename contains wildcards no files were found -->
+
+    bolHasWildcards = util.Assign (false)
+    strChecked = string.ReplaceRegex (strDataFile, "^[^+*|\\[]+$", "")
+    test.ExitIfEqual (strChecked, "", strMessage, "")
+    bolHasWildcards = util.Assign (true)
+
+  </Commands>
+
+</Function>

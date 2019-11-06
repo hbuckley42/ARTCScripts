@@ -1,0 +1,22 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Script>
+  <Description>Deletes an asset type</Description>
+  <Version>1.0</Version>
+  <Copyright>2018 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter>
+    <Name>strAssetType</Name>
+    <Type>string</Type>
+    <Source>assetType</Source>
+    <Alias>Type Name:</Alias>
+  </Parameter>
+
+  <Commands>
+
+    asset.DeleteAssetType (strAssetType)
+    cache.RefreshDatabaseAssets ()
+    cache.Refresh ("layer")
+
+  </Commands>
+</Script>

@@ -1,0 +1,81 @@
+<?xml version = "1.0" encoding = "ISO-8859-1" ?>
+
+<Script>
+  <Description>Create versine from track</Description>
+  <Version>1.1</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter required="true">
+    <Name>strCorridor</Name>
+    <Type>string</Type>
+    <Source>corridor</Source>
+    <Alias>Corridor:</Alias>
+  </Parameter>
+
+  <Commands>
+
+    <!--
+    ##################################################################################################
+    Input:
+      Corridor:         Corridor name (as parameter)
+
+    Output:
+      Survey Name:      Versine from GIS - with corridor name suffix
+      Survey Type:      GIS Versine
+      Channels:         Versine from GIS
+
+    ##################################################################################################
+    -->
+
+    <!--
+    ##################################################################################################
+    Initialise
+    ##################################################################################################
+    -->
+
+    strOutputSurvey = string.Append ("Versine from GIS - ", strCorridor)
+    strVersineChannelName = string.Append ("Versine from GIS")
+    strVersineSurveyType = string.Append ("GIS-Versine")
+
+    <!-- Unit defintions -->
+
+    uniMetre = unit.GetUnit ("Metric", "metre")
+
+    <!--
+    ##################################################################################################
+    Processing Step 1 - Create Versine
+      a. Create events from all tracks on the corridor
+      b. Merge and convert to stream and create traversals
+      c. Create versine from the traversal
+      d. Resample to 0.5 metres, compute swept mean
+    ##################################################################################################
+    -->
+
+    estTracks = event.CreateRangeEventsFromMarkers (strCorridor, , , , , uniMetre, )
+    estTracks = event.MergeWithinDistance (estTracks, 1.0, uniMetre)
+    estTracks = event.Separate (estTracks)
+    estTracks = event.SetAttribute (estTracks, "Value", 0.0)
+
+    srmVersine = event.ToStream (estTracks, "Value", 0.5, uniMetre)
+    lisTrvVersines = stream.ToTraversals (srmVersine)
+
+    srmVersine = stream.CreateVersineFromGIS (lisTrvVersines, 100.0, 40.0, 0.5, uniMetre)
+    srmVersine = stream.ComputeSwept (srmVersine, "Mean", 20)
+    srmVersine = stream.Math (srmVersine, "*", 5.0)
+
+    <!--
+    ###################################################################################################################
+    Delete original survey and save versine to new stream
+    ###################################################################################################################
+    -->
+
+    survey.Delete (strOutputSurvey)
+    stream.Save (srmVersine, strOutputSurvey, strVersineChannelName, strVersineSurveyType )
+
+    <!-- Set security on survey -->
+
+    security.GrantSurveyAccess (strOutputSurvey, "Standard User", "R")
+    security.GrantSurveyAccess (strOutputSurvey, "Power User", "RWD")
+
+  </Commands>
+</Script>

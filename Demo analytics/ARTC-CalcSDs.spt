@@ -1,0 +1,234 @@
+<?xml version = "1.0" encoding = "utf-8" ?>
+
+<Script>
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+  <Description>
+    Process geometry to:
+    Calculate Exceptions
+    Calculate SDs
+  </Description>
+
+  <Parameter>
+    <Name>strSurvey</Name>
+    <Type>string</Type>
+    <Source>survey</Source>
+    <Alias>Survey:</Alias>
+    <Default>IMP-AK Track Geometry.*</Default>
+  </Parameter>
+
+  <Parameter>
+    <Name>strSegmentType</Name>
+    <Type>string</Type>
+    <Alias>Segment:</Alias>
+    <Source>choice</Source>
+    <Choice>100 metre</Choice>
+    <Choice>200 metre</Choice>
+    <Default>200 metre</Default>
+  </Parameter>
+
+  <Commands>
+
+    <!--
+    ##################################################################################################
+    TODO:
+    ##################################################################################################    -->
+
+    test.FailIfNullOrEmpty (strSegmentType, "", "Please select a segment type")
+
+    <!-- Input TG Survey -->
+    strSurveyCategory = util.Assign ("Survey")
+    strSurveyTypeTGImported = util.Assign ("TG Imported")
+    strRawSurvey = string.SubString (strSurvey, 5)
+    strChannelNameSurfaceLeft20m = util.Assign ("Surface Left 20m")
+    strChannelNameSurfaceRight20m = util.Assign ("Surface Right 20m")
+
+    <!-- Segment -->
+    strSegmentCategoryName = util.Assign ("Segment")
+
+    <!-- Output event set  -->
+    strSDCategory = util.Assign ("Track Geometry SD")
+    strSDType = util.Assign ("Track Geometry SD")
+
+
+    lstThresholdAttrNames_WT20 = collection.ListCreate ("SD L0 Threshold - Worst Surface 20", "SD L1 Threshold - Worst Surface 20", "SD L2 Threshold - Worst Surface 20", "SD L3 Threshold - Worst Surface 20")
+
+    lstOutputAttributes  = collection.ListCreate ()
+    strAttrSegmentID = script.Call("subF-GetAttribute", lstOutputAttributes, "Segment ID")
+    strAttrSegment = script.Call("subF-GetAttribute", lstOutputAttributes, "Segment")
+    strSurveyNameAttrName =script.Call("subF-GetAttribute", lstOutputAttributes, "Survey Name")
+    strSurveyDateAttrName = script.Call("subF-GetAttribute", lstOutputAttributes, "Survey Date")
+    strAttrSDWT20 = script.Call("subF-GetAttribute", lstOutputAttributes, "SD Worst Surface 20")
+    strAttrSDLevelWT20 = script.Call("subF-GetAttribute", lstOutputAttributes, "SD Level Worst Surface 20")
+    collection.ListAddAll (lstOutputAttributes, lstThresholdAttrNames_WT20)
+
+    <!--
+    ##################################################################################################
+      Units Definition
+    ################################################################################################## -->
+    uniMetre = unit.GetUnit ("Metric", "metre")
+
+    <!--
+    ##################################################################################################
+      Global Formulas Definition
+    ################################################################################################## -->
+    strAdd2WeeksFormula = string.Append ("AddDays ('", strSurveyDateAttrName, "', 14)")
+    forAdd2Weeks = formula.Create (strAdd2WeeksFormula)
+
+    strAddMonthFormula = string.Append ("AddMonths ('", strSurveyDateAttrName, "', 1)")
+    forAddOneMonth = formula.Create (strAddMonthFormula)
+
+    <!--
+    ##################################################################################################
+       Limits Definition
+       A limit is exceeded when a value being compared against it is not in the range defined by the
+       limit value and operator.
+
+    ################################################################################################## -->
+    <!--
+    ##################################################################################################
+      Filters Definition  
+    ################################################################################################## -->
+
+    <!--
+    ###################################################################################################################
+      Processing Step 1 - Load  Data
+    ###################################################################################################################-->
+    datSurvey = survey.GetDate (strSurvey)
+    srmSurfaceLeft20m= stream.Load (strSurvey, strChannelNameSurfaceLeft20m)
+    srmSurfaceRight20m= stream.Load (strSurvey, strChannelNameSurfaceRight20m)
+
+    trvSurvey = stream.ToTraversals (srmSurfaceLeft20m)
+    estMaskForCalc = event.LoadByTraversal (strSegmentCategoryName, strSegmentType, , , trvSurvey)
+
+    <!--
+    ###################################################################################################################
+      Processing Step 2 - Calculate SDs and SD Levels
+    ###################################################################################################################-->
+
+    lstLimitsWorstSurface20 = collection.ListCreate (2.9, 4.0, 5.0, 5.6)
+    estMaskForCalcWithLimits = script.Call("F-SetEventAttributes.spf", estMaskForCalc, lstLimitsWorstSurface20, lstThresholdAttrNames_WT20)
+    estSDTopLeft20 = stream.ComputeStandardDeviationOnEvents (srmSurfaceLeft20m, estMaskForCalcWithLimits, strAttrSDWT20, 0.8)
+    estSDTopRight20 = stream.ComputeStandardDeviationOnEvents (srmSurfaceRight20m, estMaskForCalcWithLimits, strAttrSDWT20, 0.8)
+    estSD = event.Add (estSDTopLeft20, estSDTopRight20)
+    estSD = event.StackMaximum (estSD, strAttrSDWT20)
+    estSD = script.Call("F-RescaleAttributeValue.spf", estSD, lstThresholdAttrNames_WT20, strAttrSDWT20, strAttrSDLevelWT20)
+
+    <!--
+    ###################################################################################################################
+      Processing Step Temp - A temp solution for the demo - in a future production this functionality should be part 
+      of a script which performs survey import or alignment 
+    ###################################################################################################################-->
+    estRawSurvey = stream.ToEvents (srmSurfaceLeft20m)
+    estRawSurvey = event.RemoveAllAttributes (estRawSurvey)
+    estRawSurvey = event.MergeWithinDistance (estRawSurvey, 5, uniMetre)
+    estRawSurvey = event.SetAttribute (estRawSurvey, strSurveyNameAttrName, strRawSurvey)
+    estRawSurvey = event.SetAttribute (estRawSurvey, strSurveyDateAttrName, datSurvey)
+    event.DeleteByAttribute (strSurveyCategory, strSurveyNameAttrName, strRawSurvey)
+    event.Save (estRawSurvey, strSurveyCategory, strSurveyTypeTGImported)
+
+    <!--
+    ###################################################################################################################
+      Processing Step 3  
+      Set the end date to Survey Date + 1 month
+      todo: make the fuction to calculate the formula too so that the temp end date attribute does not hug around 
+    ################################################################################################################### -->
+    strEndDateAttrName  = string.Append ("End Date")
+
+    estSD = script.Call("subF-SetEventsSurveyAndDates", estSD, strRawSurvey, datSurvey, lstOutputAttributes,)
+    estSD = event.CalculateAttribute (estSD, forAddOneMonth, strEndDateAttrName, "date")
+    estSD = event.SetDatesToAttributes (estSD, strSurveyDateAttrName, strEndDateAttrName)
+    estSD = event.RemoveAttribute (estSD, strEndDateAttrName)
+
+    <!--
+    ###################################################################################################################
+      Processing Step 4 - Delete old SDs and save new
+    ################################################################################################################### -->
+
+    event.DeleteByAttribute (strSDCategory, strSurveyNameAttrName, strRawSurvey)
+    event.Save (estSD, strSDCategory, strSDType)
+
+    <!-- TODO: Move to a release script -->
+    strSDLayer = string.Append ("Track Geometry SDs")
+    layer.CreateEventLayer (strSDLayer, strSDCategory, strSDType)
+    strSurveyLayer = string.Append ("Surveys")
+    layer.CreateEventLayer (strSurveyLayer, strSurveyCategory, strSurveyTypeTGImported)
+
+
+    end:
+  </Commands>
+
+  <Function logged = "false">
+    <Name>subF-SetEventsSurveyAndDates</Name>
+    <Description>Set "Survey Name" and "Survey Date" attributes, and nationally channel name</Description>
+
+    <Parameter>
+      <Name>estInput</Name>
+      <Type>eventSet</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strRawSurvey</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>datSurvey</Name>
+      <Type>date</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>lstRetainAttributes</Name>
+      <Type>list</Type>
+    </Parameter>
+
+    <Parameter required = "false">
+      <Name>strChannel</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Result>
+      <Name>estResult</Name>
+      <Type>eventSet</Type>
+    </Result>
+
+    <Commands>
+      strSurveyNameAttrName = string.Append ("Survey Name")
+      strSurveyDateAttrName = string.Append ("Survey Date")
+      strChannelAttrName = string.Append ("Channel")
+
+      estResult = event.SetAttribute (estInput, strSurveyNameAttrName, strRawSurvey)
+      estResult = event.SetAttribute (estResult, strSurveyDateAttrName, datSurvey)
+      estResult = event.SetDatesToAttributes (estResult, strSurveyDateAttrName, strSurveyDateAttrName)
+      estResult = event.RetainAttributes (estResult, lstRetainAttributes)
+      control.GoToIf("$strChannel==null", "end")
+      estResult = event.SetAttribute (estResult, strChannelAttrName, strChannel)
+      end:
+
+    </Commands>
+  </Function>
+  <Function logged = "false">
+    <Name>subF-GetAttribute</Name>
+    <Description></Description>
+
+    <Parameter>
+      <Name>lstAttributes</Name>
+      <Type>list</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strAttributeName</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Result>
+      <Name>strAttributeName</Name>
+      <Type>string</Type>
+    </Result>
+
+    <Commands>
+      collection.ListAdd (lstAttributes, strAttributeName)
+    </Commands>
+  </Function>
+
+</Script>

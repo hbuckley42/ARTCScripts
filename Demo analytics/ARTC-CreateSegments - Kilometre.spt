@@ -1,0 +1,130 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Script>
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+  <Description>Creates Kilometre Segments</Description>
+
+  <Parameter>
+    <Name>strCorridor</Name>
+    <Type>string</Type>
+    <Source>corridor</Source>
+    <Alias>Line: </Alias>
+    <Default>10003</Default>
+  </Parameter>
+
+  <Commands>
+    script.SetLogLevel ("error")
+
+    strSegmentCategoryName = util.Assign ("Segment")
+    strSegmentType = util.Assign ("Kilometre")
+    strSegmentsLayer = string.Append ("Segments")
+
+    lstOutAttributes = collection.ListCreate ()
+    strAttrSegment = script.Call("subF-GetAttribute", lstOutAttributes, "Segment")
+    strAttrSegmentID = script.Call("subF-GetAttribute", lstOutAttributes, "Segment ID")
+    strAttrCurveID = script.Call("subF-GetAttribute", lstOutAttributes, "Curve ID")
+    strAttrRadius = script.Call("subF-GetAttribute", lstOutAttributes, "Radius")
+    strAttrVersine = script.Call("subF-GetAttribute", lstOutAttributes, "Versine")
+    strAttrCurveSide = script.Call("subF-GetAttribute", lstOutAttributes, "Curve Side")
+
+    estSegment = event.CreateEmptyEventSet ()
+    estSegment = script.Call ("subF-CreateMockMarkerEvent", strCorridor, estSegment, 300)
+    estSegment = script.Call ("subF-CreateMockMarkerEvent", strCorridor, estSegment, 301)
+    estSegment = script.Call ("subF-CreateMockMarkerEvent", strCorridor, estSegment, 302)
+    estSegment = script.Call ("subF-CreateMockMarkerEvent", strCorridor, estSegment, 303)
+    estSegment = script.Call ("subF-CreateMockMarkerEvent", strCorridor, estSegment, 304)
+    estSegment = script.Call ("subF-CreateMockMarkerEvent", strCorridor, estSegment, 305)
+    estSegment = script.Call ("subF-CreateMockMarkerEvent", strCorridor, estSegment, 306)
+    estSegment = script.Call ("subF-CreateMockMarkerEvent", strCorridor, estSegment, 307)
+    estSegment = script.Call ("subF-CreateMockMarkerEvent", strCorridor, estSegment, 308)
+    estSegment = script.Call ("subF-CreateMockMarkerEvent", strCorridor, estSegment, 309)
+
+    estSegment = event.SetAttributeToUniqueId (estSegment, strAttrSegmentID)
+    estSegment = event.RetainAttributes (estSegment, lstOutAttributes)
+
+    event.DeleteByCorridor (strSegmentCategoryName, strSegmentType, , , strCorridor)
+    event.Save (estSegment, strSegmentCategoryName, strSegmentType)
+
+    layer.CreateEventLayer (strSegmentsLayer, strSegmentCategoryName, strSegmentType)
+
+
+  </Commands>
+
+  <Function>
+
+    <Name>subF-CreateMockMarkerEvent</Name>
+    <Parameter>
+      <Name>strCorridor</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>estInSegment</Name>
+      <Type>eventSet</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>intStartMarker</Name>
+      <Type>integer</Type>
+    </Parameter>
+
+    <Result>
+      <Name>estOutSegment</Name>
+      <Type>eventSet</Type>
+    </Result>
+
+    <Commands>
+
+      strAttrSegment = util.Assign ("Segment")
+      strStartDateAttrName = string.Append ("Start Date")
+      strEndDateAttrName = string.Append ("End Date")
+
+      uniMetre = unit.GetUnit ("Metric", "metre")
+
+      forEndMarker = formula.Create ("$intStartMarker +1")
+      intEndMarker = formula.Evaluate (forEndMarker, , "integer")
+      strStartMarker = string.Format ("%s", intStartMarker)
+      strEndMarker = string.Format ("%s", intEndMarker)
+
+      strSegment = string.Format ("Kilometre %d - %d", intStartMarker, intEndMarker)
+      estOutSegment = event.CreateRangeEventsFromMarkers (strCorridor, strStartMarker, 0, strEndMarker, 0, uniMetre, "745010")
+      estOutSegment = event.SetAttribute (estOutSegment, strAttrSegment, strSegment)
+
+      datSegmentStartDate = util.ParseDate ("1900-01-01", "yyyy-MM-dd")
+      datSegmentEndDate = util.ParseDate ("3000-01-01", "yyyy-MM-dd")
+      estOutSegment = event.SetAttribute (estOutSegment, strStartDateAttrName, datSegmentStartDate)
+      estOutSegment = event.SetAttribute (estOutSegment, strEndDateAttrName, datSegmentEndDate)
+      estOutSegment = event.SetDatesToAttributes (estOutSegment, strStartDateAttrName, strEndDateAttrName)
+
+      estOutSegment = event.Add (estOutSegment, estInSegment)
+
+    </Commands>
+
+  </Function>
+
+  <Function logged = "false">
+    <Name>subF-GetAttribute</Name>
+    <Description></Description>
+
+    <Parameter>
+      <Name>lstAttributes</Name>
+      <Type>list</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strAttributeName</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Result>
+      <Name>strAttributeName</Name>
+      <Type>string</Type>
+    </Result>
+
+    <Commands>
+      collection.ListAdd (lstAttributes, strAttributeName)
+    </Commands>
+  </Function>
+
+</Script>

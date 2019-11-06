@@ -1,0 +1,285 @@
+<?xml version = "1.0" encoding = "utf-8" ?>
+
+<Script>
+
+  <Description>Aligns ICW survey.</Description>
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter>
+    <Name>strSurvey</Name>
+    <Type>string</Type>
+    <Source>survey</Source>
+    <Alias>Survey:</Alias>
+    <Default>^IMP-ICW.*</Default>
+  </Parameter>
+
+  <Commands>
+
+    <!--
+    ##################################################################################################
+    Input:
+      Survey:           Imported survey name (as parameter)
+
+    Output:
+      Survey Name:      Imported survey name with IMP- prefix replaced with ALN-
+      Survey Type:      Aligned ICW
+      Channels:         Curvature
+	                    Twist 14m
+
+      Survey Name:      Renamed imported survey with IMP- prefix replaced with PRO-
+	  Survey Type:      AK Combined
+
+    ##################################################################################################
+    -->
+
+    bolHasWildcards = script.Call ("BPS-F-CheckForWildcards.spf", strSurvey)
+    control.GoToIf ("$bolHasWildcards", "End")
+
+	<!-- Check survey is an imported or processed ICW survey -->
+
+    test.FailIfNotMatch (strSurvey, "^(IMP|PRO)-ICW_[0-9]+_[0-9]{8}$", "", "Survey must be an imported ICW survey.")
+
+    <!--
+    ##################################################################################################
+    Initialise
+    ##################################################################################################
+    -->
+
+	<!-- Imported and Processed survey names and channels -->
+
+	strImportedSurvey = string.ReplaceRegex (strSurvey, "^(IMP|PRO)-", "IMP-")
+	strProcessedSurvey = string.ReplaceRegex (strSurvey, "^(IMP|PRO)-", "PRO-")
+	lisChannels = collection.ListCreate (
+                                           "Acc1",
+                                           "Acc2",
+                                           "Acc3",
+                                           "Acc4",
+                                           "Body Rock Front",
+                                           "Body Rock Rear",
+                                           "Bounce Front",
+                                           "Bounce Rear",
+                                           "Brake Cylinder",
+                                           "Intrain Force",
+                                           "LP1",
+                                           "LP2",
+                                           "LP3",
+                                           "LP4",
+                                           "Rail Profile Left",
+                                           "Rail Profile Right",
+                                           "Speed",
+                                           "Twist 14m",
+                                           "Twist 2m"
+										 )
+
+	<!-- Survey name, types and channels -->
+
+	strBaselineSurvey = string.ReplaceRegex (strSurvey, "^(IMP|PRO)-", "BAS-")
+	strBaselineSurveyType = string.Append ("Baseline ICW")
+    strTwistChannel = string.Append ("Twist 14m")
+
+	strAlignedSurvey = string.ReplaceRegex (strSurvey, "^(IMP|PRO)-", "ALN-")
+	strAlignedSurveyType = string.Append ("Aligned ICW")
+
+	<!-- Attribute Names -->
+
+	strLengthAttrName = string.Append ("Length")
+
+    strSurveyNameAttrName = string.Append ("Survey Name")
+    strSurveyDateAttrName = string.Append ("Survey Date")
+    strProcessedDateAttrName = string.Append ("Processed Date")
+
+    lstSurveyAttributes = collection.ListCreate (strSurveyNameAttrName, strSurveyDateAttrName, strProcessedDateAttrName, strLengthAttrName)
+
+    <!--
+    ##################################################################################################
+      Units Definition
+    ##################################################################################################
+	-->
+
+    uniMetre = unit.GetUnit ("Metric", "metre")
+
+    <!--
+    ##################################################################################################
+    Global Formulas Definition
+    ##################################################################################################
+	-->
+
+    forToday = formula.Create ("CurrentDate")
+    datToday = formula.Evaluate (forToday, , "date")
+
+    datSurveyDate = survey.GetDate (strSurvey)
+
+    <!--
+    ##################################################################################################
+    Filters Definition
+    ##################################################################################################
+	-->
+
+    lisDifferentiateCoefficients = collection.ListCreate (1.0, -1.0)
+    filDifferentiate = filter.CreateFIRFilter (lisDifferentiateCoefficients)
+
+    <!--
+    ##################################################################################################
+    Processing Step 1 - Load survey data from the database
+    ##################################################################################################
+	-->
+
+    mapImportedSurvey = script.Call ("BPS-F-LoadSurvey", strSurvey, lisChannels)
+
+    srmImportedTwist = collection.MapGet (mapImportedSurvey, strTwistChannel)
+    estSurvey = stream.ToEvents (srmImportedTwist)
+
+    lstChannels = collection.ListCreate (strTwistChannel)
+	lstTypes = collection.ListCreate (strBaselineSurveyType)
+    mapBaselineChannels = stream.LoadAggregatedByDate (lstChannels, lstTypes, estSurvey, datToday, "LatestSurveyOnOrBeforeDate")
+    srmBaselineTwist = collection.MapGet (mapBaselineChannels, strTwistChannel)
+
+    <!--
+    ##################################################################################################
+      Processing Step 4 - Alignment
+       a. Load the baseline alignment stream data for the area covered by the survey to be aligned
+       b. Re-sample the baseline to the area covered by the survey to be aligned, using stream values
+          of 0 - this is required to ensure alignment works correctly
+       c. Differentiate the base and current LTOP (to improve the alignment)
+       d. Differentiate the base and current LTOP (to improve the alignment)
+       e. Calculate the alignment, parameters used:
+            window - 50m (size of window to perform alignment over, moved over each interval)
+            interval - 100m (how often to do an alignment)
+            maxDisplacement - 100m (maximum displacement allowed between stream and base stream)
+            minCorrelation - 0.7 (minimum correlation value, -1.0 is worst, +1.0 is perfect fit)
+       d. Align all channels using the calculated alignment
+       e. Now calculate rolling SDs
+       f. Trim the data
+    ################################################################################################## -->
+
+	srmImportedTwist = stream.ComputeSwept (srmImportedTwist, "Mean", 5)
+
+    srmBaselineTwist = stream.ComputeSwept (srmBaselineTwist, "Mean", 5)
+    srmBaselineTwist = stream.ResampleToStream (srmBaselineTwist, srmImportedTwist, false)
+
+    srmDisplacement = stream.GetAlignment (srmImportedTwist, srmBaselineTwist, 200.0, uniMetre, 50.0, uniMetre, 20.0, uniMetre, 0.90)
+
+    <!--srmDisplacement = stream.GetAlignment (srmImportedTwist, srmBaselineTwist, 300.0, uniMetre, 150.0, uniMetre, 50.0, uniMetre, 0.60) -->
+console.ShowValue ("srmImportedTwist", srmImportedTwist)
+console.ShowValue ("srmBaselineTwist", srmBaselineTwist)
+console.ShowValue ("srmDisplacement", srmDisplacement)
+
+    mapAlignedSurvey = script.Call ("BPS-F-AlignSurvey", mapImportedSurvey, srmDisplacement)
+
+    <!--
+    ###################################################################################################################
+      Processing Step 7 - Save aligned survey and grant permissions
+    ################################################################################################################### -->
+
+    survey.Delete (strAlignedSurvey)
+	survey.Save (strAlignedSurvey, datSurveyDate, strAlignedSurveyType, mapAlignedSurvey)
+
+    security.GrantSurveyAccess (strAlignedSurvey, "Power User", "RWD")
+    security.GrantSurveyAccess (strAlignedSurvey, "Standard User", "R")
+
+    <!-- Rename imported survey to processed (if imported survey passed as argument) -->
+<!--
+	bolSurveyExists = survey.Exists (strImportedSurvey)
+	control.GoToIf ("$bolSurveyExists == false", "End")
+        survey.Rename (strImportedSurvey, strProcessedSurvey)
+-->
+    end:
+
+  </Commands>
+
+<Function logged = "false">
+  <Version>1.0</Version>
+  <Description>Loads required channels from a survey</Description>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+  <Name>BPS-F-LoadSurvey</Name>
+
+  <Parameter required = "true">
+    <Name>strSurvey</Name>
+    <Type>string</Type>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>lisChannelNames</Name>
+    <Type>list</Type>
+  </Parameter>
+
+  <Result>
+    <Name>mapChannels</Name>
+    <Type>map</Type>
+  </Result>
+
+  <Commands>
+
+    <!-- Formulas -->
+
+    forIndexDecrement = formula.Create ("$intIndex - 1")
+
+    <!-- Initialise map of channels, exit if no channels to load -->
+
+    mapChannels = collection.MapCreate ()
+	test.ExitIfNullOrEmpty (lisChannelNames, "", "")
+
+    <!-- Loop through the list of channels loading the channels -->
+
+    intIndex = collection.Size (lisChannelNames)
+    BeginLoop:
+        intIndex = formula.Evaluate (forIndexDecrement, , "integer")
+        strChannelName = collection.ListGet (lisChannelNames, intIndex)
+		srmChannel = stream.Load (strSurvey, strChannelName)
+        collection.MapPut (mapChannels, strChannelName, srmChannel)
+        control.GoToIf ("$intIndex > 0", "BeginLoop")
+
+  </Commands>
+
+</Function>
+
+<Function logged = "false">
+  <Version>1.0</Version>
+  <Description>Aligns channels from a survey</Description>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+  <Name>BPS-F-AlignSurvey</Name>
+
+  <Parameter required = "true">
+    <Name>mapChannels</Name>
+    <Type>map</Type>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>srmDisplacement</Name>
+    <Type>stream</Type>
+  </Parameter>
+
+  <Result>
+    <Name>mapAlignedChannels</Name>
+    <Type>map</Type>
+  </Result>
+
+  <Commands>
+
+    <!-- Formulas -->
+
+    forIndexDecrement = formula.Create ("$intIndex - 1")
+
+    <!-- Initialise map of aligned channels, exit if no channels to align -->
+
+    mapAlignedChannels = collection.MapCreate ()
+	test.ExitIfNullOrEmpty (mapChannels, "", "")
+
+    <!-- Loop through the list of channels loading the channels -->
+
+	lisChannelNames = collection.MapKeys (mapChannels)
+    intIndex = collection.Size (lisChannelNames)
+    BeginLoop:
+        intIndex = formula.Evaluate (forIndexDecrement, , "integer")
+        strChannelName = collection.ListGet (lisChannelNames, intIndex)
+		srmChannel = collection.MapGet (mapChannels, strChannelName)
+		srmAlignedChannel = stream.Align (srmChannel, srmDisplacement)
+        collection.MapPut (mapAlignedChannels, strChannelName, srmAlignedChannel)
+        control.GoToIf ("$intIndex > 0", "BeginLoop")
+
+  </Commands>
+
+</Function>
+
+</Script>

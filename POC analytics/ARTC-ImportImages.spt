@@ -1,0 +1,24 @@
+<?xml version="1.1" encoding="ISO-8859-1"?>
+<Script>
+  <Description>Imports Images</Description>
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter required = "true">
+    <Name>strDataFile</Name>
+    <Type>string</Type>
+    <Alias>File Name:</Alias>
+    <Source>userFile</Source>
+    <Default>18-07-04_10026_Ulan Line_330.409.9_350.409.7_SIR-30200_2GHz.csv</Default>
+  </Parameter>
+
+  <Commands>
+
+    survey.Delete ("ARTC Image 2GHz")
+    uflDataFile = userfile.GetUserFile (strDataFile)
+    ufoImagesFolder = userfile.GetUserFolder (".")
+    survey.ImportImagesFile (uflDataFile, "ARTC Image 2GHz", 04-07-2018 , "Image 2GHz", "ARTC-Image_2GHz.dld", ufoImagesFolder)
+
+  </Commands>
+
+</Script>

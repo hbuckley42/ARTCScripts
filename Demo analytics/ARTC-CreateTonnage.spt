@@ -1,0 +1,94 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Script>
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+  <Description>Creates Tonnage </Description>
+
+  <Commands>
+    script.SetLogLevel ("error")
+
+    strTonnageCategory = util.Assign ("Tonnage")
+    strTonnageType = util.Assign ("Tonnage")
+
+    strTonnageLayerName = util.Assign ("Tonnage")
+    uniMetre = unit.GetUnit ("Metric", "metre")
+
+
+    estTonnage = event.CreateRangeEventsFromMarkers ("10003", "300", 0, "300", 2, uniMetre, "745010")
+    estTonnage = event.SetAttribute(estTonnage, "Tonnage", 0.0)
+    estTonnage = script.Call("subF-CreateMockTonnage", estTonnage, "2017-01-01", 24.8)
+    estTonnage = script.Call("subF-CreateMockTonnage", estTonnage, "2017-04-01", 25.2)
+    estTonnage = script.Call("subF-CreateMockTonnage", estTonnage, "2017-07-01", 25.9)
+    estTonnage = script.Call("subF-CreateMockTonnage", estTonnage, "2017-10-01", 26.0)
+
+    estTonnage = script.Call("subF-CreateMockTonnage", estTonnage, "2018-01-01", 26.5)
+    estTonnage = script.Call("subF-CreateMockTonnage", estTonnage, "2018-04-01", 27.1)
+    estTonnage = script.Call("subF-CreateMockTonnage", estTonnage, "2018-07-01", 27.5)
+    estTonnage = script.Call("subF-CreateMockTonnage", estTonnage, "2018-10-01", 28.8)
+
+    estTonnage = script.Call("subF-CreateMockTonnage", estTonnage, "2019-01-01", 29.5)
+    estTonnage = script.Call("subF-CreateMockTonnage", estTonnage, "2019-04-01", 30.1)
+    estTonnage = script.Call("subF-CreateMockTonnage", estTonnage, "2019-07-01", 32.3)
+    estTonnage = script.Call("subF-CreateMockTonnage", estTonnage, "2019-10-01", 33.0)
+
+    estTonnage = event.RemoveAttribute(estTonnage,"dummy")
+
+    event.DeleteByCategory (strTonnageCategory)
+    event.Save (estTonnage, strTonnageCategory, strTonnageType)
+
+
+    layer.CreateEventLayer (strTonnageLayerName, strTonnageCategory, strTonnageType)
+
+
+  </Commands>
+
+  <Function>
+
+    <Name>subF-CreateMockTonnage</Name>
+    <Parameter>
+      <Name>estTonnage</Name>
+      <Type>eventSet</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strStartDate</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>dblTonnage</Name>
+      <Type>double</Type>
+    </Parameter>
+
+    <Result>
+      <Name>estReturnTonnage</Name>
+      <Type>eventSet</Type>
+    </Result>
+
+    <Commands>
+
+      strAttrStartDate  = util.Assign ("Start Date")
+      strAttrEndDate  = util.Assign ("End Date")
+      strAttrTonnage  = util.Assign ("Tonnage")
+
+      uniMetre = unit.GetUnit ("Metric", "metre")
+
+      datStartDate = util.ParseDate (strStartDate, "yyyy-MM-dd")
+      forEndDate = formula.Create ("AddMonths ($datStartDate, 3)")
+
+      estReturnTonnage = event.CreateRangeEventsFromMarkers ("10003", "300", 0, "310", 0, uniMetre, "745010")
+      estReturnTonnage = event.SetAttribute (estReturnTonnage, strAttrTonnage, dblTonnage)
+      estReturnTonnage = event.SetAttribute (estReturnTonnage, strAttrStartDate, datStartDate)
+      estReturnTonnage = event.CalculateAttribute (estReturnTonnage, forEndDate, strAttrEndDate, "date")
+      estReturnTonnage = event.SetDatesToAttributes (estReturnTonnage, strAttrStartDate, strAttrEndDate)
+      estReturnTonnage = event.RetainAttribute (estReturnTonnage, strAttrTonnage)
+      estReturnTonnage = event.MergeWithinDistance (estReturnTonnage, 1, uniMetre)
+
+      estReturnTonnage = event.Add (estReturnTonnage, estTonnage)
+
+    </Commands>
+
+  </Function>
+
+</Script>

@@ -1,0 +1,153 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Script>
+  <Description>Imports network model data for a corridor.</Description>
+  <Version>1.1</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter required = "true">
+    <Name>strUserName</Name>
+    <Type>string</Type>
+    <Source>user</Source>
+    <Default>DataAdmin</Default>
+    <Alias>User File Owner</Alias>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strCentrelineFile</Name>
+    <Type>string</Type>
+    <Alias>Centreline Filename:</Alias>
+    <Source>userFile</Source>
+    <Default>import-data/network-model/.*_Centreline_.*csv</Default>
+    <AssociatedParameter>strUserName</AssociatedParameter>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strSuccessFolderName</Name>
+    <Type>string</Type>
+    <Alias>Success Folder Name:</Alias>
+    <Source>userFolder</Source>
+    <Default>processed-data/network-model</Default>
+    <AssociatedParameter>strUserName</AssociatedParameter>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strFailedFolderName</Name>
+    <Type>string</Type>
+    <Alias>Failed Folder Name:</Alias>
+    <Source>userFolder</Source>
+    <Default>failed-data/network-model</Default>
+    <AssociatedParameter>strUserName</AssociatedParameter>
+  </Parameter>
+
+  <Commands>
+
+    <!-- Check for name including wildcards, indicating no matching files found -->
+
+    bolHasWildcards = script.Call ("BPS-F-CheckForWildcards.spf", strCentrelineFile)
+    control.GoToIf ("$bolHasWildcards", "End")
+
+    <!--
+    ##################################################################################################
+    Initialise
+    ##################################################################################################
+    -->
+
+    <!-- Validate filename, filename: <corridor>_Centreline_<yyyymmdd>.csv, with optional path -->
+
+    strFilename = string.ReplaceRegex (strCentrelineFile, "^.*(\\\\|/)", "")
+    strCheckFilename = string.ReplaceRegex (strFilename, "[A-Z][0-9]{2}_Centreline_[0-9]{8}[.]csv", "")
+    test.FailIfNotEqual (strCheckFilename, "", "", "Filename is an invalid format")
+
+    <!-- Define DLD names -->
+
+    strReferenceLineDLD = string.Append ("ARTC-NM_ReferenceLine.dld")
+    strKMPostDLD = string.Append ("ARTC-NM_KMPost.dld")
+    strTrackDLD = string.Append ("ARTC-NM_Centreline.dld")
+
+    <!-- Set markers and centreline filenames from reference line filename:
+        <corridor>_ReferenceLine_<yyyymmdd>.csv
+        <corridor>_KMPost_<yyyymmdd>.csv -->
+
+    strReferenceLineFile = string.Replace (strCentrelineFile, "_Centreline_", "_ReferenceLine_")
+    strKMPostFile = string.Replace (strCentrelineFile, "_Centreline_", "_KMPost_")
+
+    <!-- Check which files exist, only check for reference line if KM file exists -->
+
+    bolKMPostsFileExists = util.Assign (false)
+    bolReferenceLineFileExists = util.Assign (false)
+
+    uflCentrelineFile = userfile.GetUserFile (strUserName, strCentrelineFile)
+    uflKMPostFile = userfile.GetUserFile (strUserName, strKMPostFile)
+    uflReferenceLineFile = userfile.GetUserFile (strUserName, strReferenceLineFile)
+
+    strErrorMessage = string.Format ("Centreline file %s does not exist.", strCentrelineFile)
+    test.FailIfNullOrEmpty (uflCentrelineFile, "", strErrorMessage)
+
+    control.GoToIf ("$uflKMPostFile == null", "EndFileCheck")
+        bolKMPostsFileExists = util.Assign (true)
+        control.GoToIf ("$uflReferenceLineFile == null", "EndFileCheck")
+           bolReferenceLineFileExists = util.Assign (true)
+    EndFileCheck:
+
+    script.MoveFileOnCompletion (strUserName, strReferenceLineFile, strSuccessFolderName, strFailedFolderName)
+    script.MoveFileOnCompletion (strUserName, strKMPostFile, strSuccessFolderName, strFailedFolderName)
+    script.MoveFileOnCompletion (strUserName, strCentrelineFile, strSuccessFolderName, strFailedFolderName)
+
+    <!-- Extract corridor name from track centerline filename -->
+
+    strCorridor = string.ReplaceRegex (strFilename, "_.*$", "")
+
+    <!--
+    ##################################################################################################
+    Import network model
+        a. Remove track segments and straightened vertices from all assets on corridor
+        b. Import Reference lines and markers
+        c. Import and straighten tracks
+        d. Update asset locations on corridor
+    ##################################################################################################
+    -->
+
+    <!-- Remove track segments and straightened vertices from all assets on corridor -->
+
+    asset.Delete ("Track Segment", strCorridor)
+    corridor.RemoveAllAssetsVertices (strCorridor, "STRAIGHTENED")
+
+    <!-- Import reference line and KM Posts, if required -->
+
+    control.GoToIf ("$bolReferenceLineFileExists == false", "ImportKMPosts")
+        iNumImported = asset.ImportReferenceLinesFile (uflReferenceLineFile, strReferenceLineDLD)
+        strMessage = string.Format ("Imported %d reference lines for corridor %s", iNumImported, strCorridor)
+        console.ShowValue (strMessage, "")
+
+    ImportKMPosts:
+    control.GoToIf ("$bolKMPostsFileExists == false", "ImportTracks")
+        iNumImported = asset.ImportMarkersFile (uflKMPostFile, strKMPostDLD)
+        strMessage = string.Format ("Imported %d KM posts for corridor %s", iNumImported, strCorridor)
+        console.ShowValue (strMessage, "")
+
+    ImportTracks:
+
+    <!-- Import and straighten tracks  -->
+
+    iNumImported = asset.ImportTracksFile (uflCentrelineFile, strTrackDLD)
+    strMessage = string.Format ("Imported %d track segments for corridor %s", iNumImported, strCorridor)
+    console.ShowValue (strMessage, "")
+    corridor.StraightenTracks (strCorridor)
+
+    <!-- Update asset locations -->
+
+    script.Call ("ARTC-F-LocateAssetsOnTrack.spf", strCorridor, "Culvert")
+    script.Call ("ARTC-F-LocateAssetsOnTrack.spf", strCorridor, "Joint")
+    script.Call ("ARTC-F-LocateAssetsOnTrack.spf", strCorridor, "Level Crossing")
+    script.Call ("ARTC-F-LocateAssetsOnTrack.spf", strCorridor, "Overbridge")
+    script.Call ("ARTC-F-LocateAssetsOnTrack.spf", strCorridor, "Signal")
+    script.Call ("ARTC-F-LocateAssetsOnTrack.spf", strCorridor, "Tunnel")
+    script.Call ("ARTC-F-LocateAssetsOnTrack.spf", strCorridor, "Turnout")
+    script.Call ("ARTC-F-LocateAssetsOnTrack.spf", strCorridor, "Underbridge")
+
+    End:
+
+  </Commands>
+
+</Script>

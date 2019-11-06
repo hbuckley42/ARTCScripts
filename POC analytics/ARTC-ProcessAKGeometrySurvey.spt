@@ -1,0 +1,311 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+
+<Script>
+  <Version>1.0</Version>
+  <Description>Process AK Geometry Survey</Description>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter required = "True">
+    <Name>strSurvey</Name>
+    <Type>string</Type>
+    <Source>survey</Source>
+    <Alias>Survey</Alias>
+    <Default>^ALN-AK_Combined.*</Default>
+  </Parameter>
+
+  <Commands>
+
+    <!-- Check for name including wildcards, indicating no matching files found -->
+
+    bolHasWildcards = script.Call ("BPS-F-CheckForWildcards.spf", strSurvey)
+    control.GoToIf ("$bolHasWildcards", "End")
+
+    <!-- Check survey is an imported or processed AK survey -->
+
+    test.FailIfNotMatch (strSurvey, "^ALN-AK_Combined_[0-9]+_[0-9]{8}$", "", "Survey must be an aligned AK survey.")
+
+    <!--
+    ##################################################################################################
+    Initialise
+    ##################################################################################################
+    -->
+
+	<!-- Segment event category, types and attributes -->
+
+	strSegmentCategory = string.Append ("Segment")
+	str20mBinType = string.Append ("20m Bin")
+    strBasecodeType = string.Append ("Basecode")
+	strCurveAndTangentType = string.Append ("Curves &amp; Tangents")
+    strLineSegmentType = string.Append ("Line Segment")
+    strPricingZoneType = string.Append ("Pricing Zone")
+    strProvisioningCentreType = string.Append ("Provisioning Centre")
+	lisAllSegmentTypes = collection.ListCreate (str20mBinType, strBasecodeType, strCurveAndTangentType, strLineSegmentType, strPricingZoneType, strProvisioningCentreType)
+
+	<!-- Twist event category and attributes-->
+
+	strTwistCategory = string.Append ("Twist")
+
+	strMaxTwistAttrName = string.Append ("Max Twist")
+
+	<!-- TMS percentage above threshold event category and attributes-->
+
+	strTMSCategory = string.Append ("TMS Above Threshold")
+
+	strDisplayPctAbove300AttrName = string.Append ("% above 300 (Rounded)")
+	strDisplayPctAbove500AttrName = string.Append ("% above 500 (Rounded)")
+	strDisplayPctAbove700AttrName = string.Append ("% above 700 (Rounded)")
+	strPctAbove300AttrName = string.Append ("% above 300")
+	strPctAbove500AttrName = string.Append ("% above 500")
+	strPctAbove700AttrName = string.Append ("% above 700")
+
+	strPctAbove300AttrNameAsArgument = string.Append ("'", strPctAbove300AttrName, "'")
+	strPctAbove500AttrNameAsArgument = string.Append ("'", strPctAbove500AttrName, "'")
+	strPctAbove700AttrNameAsArgument = string.Append ("'", strPctAbove700AttrName, "'")
+
+	<!-- General attribute names -->
+
+	strEndDateAttrName = string.Append ("End Date")
+	strRailAttrName = string.Append ("Rail")
+	strSegmentationTypeAttrName = string.Append ("Segmentation Type")
+	strSurveyDateAttrName = string.Append ("Survey Date")
+	strSurveyNameAttrName = string.Append ("Survey Name")
+	strTypeAttrName = string.Append ("Type")
+
+	<!-- AK Geometry channels -->
+
+    strTwistChannel = string.Append ("Twist 14 Xtn")
+	strCalculated6mMSLeftChannel = string.Append ("Calculated 6mMS Left")
+	strCalculated6mMSRightChannel = string.Append ("Calculated 6mMS Right")
+	strCalculatedLMSLeftChannel = string.Append ("Calculated LMS Left")
+	strCalculatedLMSRightChannel = string.Append ("Calculated LMS Right")
+	strCalculatedTMSLeftChannel = string.Append ("Calculated TMS Left")
+	strCalculatedTMSRightChannel = string.Append ("Calculated TMS Right")
+
+	<!-- Define units -->
+
+	uniMetre = unit.GetUnit ("Metric", "metre")
+
+	<!-- Define limits -->
+
+	limLE300 = limit.Create ("300", 300.0, uniMetre, "le")
+	lisLimLE300 = collection.ListCreate (limLE300)
+
+	limLE500 = limit.Create ("500", 500.0, uniMetre, "le")
+	lisLimLE500 = collection.ListCreate (limLE500)
+
+	limLE700 = limit.Create ("700", 700.0, uniMetre, "le")
+	lisLimLE700 = collection.ListCreate (limLE700)
+
+	<!-- Formula to add 4 months to start date -->
+
+	strForAdd4Months = string.Append ("AddMonths('", strSurveyDateAttrName, "',4)") 
+	forAdd4Months = formula.Create (strForAdd4Months)
+
+    <!-- Formula to decrement index -->
+
+    forIndexDecrement = formula.Create ("$intIndex - 1")
+
+    <!--
+    ##################################################################################################
+    Step 1 - Load survey channels and segmentation
+	  a. Load AK Geometry channels
+	  b. Load segmentations covering the survey
+    ##################################################################################################
+    -->
+
+	datSurvey = survey.GetDate (strSurvey)
+
+	srmTwist = stream.Load (strSurvey, strTwistChannel)
+	srm6mMSLeft = stream.Load (strSurvey, strCalculated6mMSLeftChannel)
+	srm6mMSRight = stream.Load (strSurvey, strCalculated6mMSRightChannel)
+	srmLMSLeft = stream.Load (strSurvey, strCalculatedLMSLeftChannel)
+	srmLMSRight = stream.Load (strSurvey, strCalculatedLMSRightChannel)
+	srmTMSLeft = stream.Load (strSurvey, strCalculatedTMSLeftChannel)
+	srmTMSRight = stream.Load (strSurvey, strCalculatedTMSRightChannel)
+
+	<!-- Load each of the segmentations covering the survey, note: all channels have the same traversal -->
+
+    trvSurvey = stream.ToTraversals (srmTMSLeft)
+	mapAllSegmentations = collection.MapCreate ()
+	
+    intIndex = collection.Size (lisAllSegmentTypes)
+	BeginLoopLoadSegments:
+        intIndex = formula.Evaluate (forIndexDecrement, , "integer")
+        strSegmentType = collection.ListGet (lisAllSegmentTypes, intIndex)
+
+		estSegments = event.LoadByTraversal (strSegmentCategory, strSegmentType, , , trvSurvey)
+		collection.MapPut (mapAllSegmentations, strSegmentType, estSegments)
+
+        control.GoToIf ("$intIndex > 0", "BeginLoopLoadSegments")
+
+    <!--
+    ##################################################################################################
+    Step 2 - Calculate absolute maximum twist
+	  a. 
+    ##################################################################################################
+    -->
+
+    <!-- Calculate absolute maximum twist -->
+
+	lisTwistSegmentTypes = collection.ListCreate (str20mBinType, strCurveAndTangentType)
+
+	estAllMaxTwist = event.CreateEmptyEventSet ()
+	srmAbsoluteTwist = stream.Absolute (srmTwist)
+
+	<!-- Loop through each set of segments to calculate maximum absolute of twist -->
+
+    intIndex = collection.Size (lisTwistSegmentTypes)
+	BeginLoopSegmentTwist:
+
+        intIndex = formula.Evaluate (forIndexDecrement, , "integer")
+        strSegmentType = collection.ListGet (lisTwistSegmentTypes, intIndex)
+		estSegments = collection.MapGet (mapAllSegmentations, strSegmentType)
+
+		<!-- Calculate maximum of twist -->
+
+		estMaxTwist = stream.ComputeMaximumOnEvents (srmAbsoluteTwist, estSegments, strMaxTwistAttrName)
+		estMaxTwist = event.SetAttribute (estMaxTwist, strSegmentationTypeAttrName, strSegmentType)
+		estAllMaxTwist = event.Add (estAllMaxTwist, estMaxTwist)
+
+        control.GoToIf ("$intIndex > 0", "BeginLoopSegmentTwist")
+
+	<!-- Calculate start and end dates from survey date -->
+
+	estAllMaxTwist = event.SetAttribute (estAllMaxTwist, strSurveyNameAttrName, strSurvey)
+	estAllMaxTwist = event.SetAttribute (estAllMaxTwist, strSurveyDateAttrName, datSurvey)
+	estAllMaxTwist = event.CalculateAttribute (estAllMaxTwist, forAdd4Months, strEndDateAttrName, "date")
+	estAllMaxTwist = event.SetDatesToAttributes (estAllMaxTwist, strSurveyDateAttrName, strEndDateAttrName)
+	estAllMaxTwist = event.RemoveAttribute (estAllMaxTwist, strEndDateAttrName)
+
+    <!--
+    ##################################################################################################
+    Step 2 - Calculate percentage coverage above 300, 500 and 700 for TMS Left and Right
+	  a. 
+    ##################################################################################################
+    -->
+	
+<!--
+	lisTMSSegmentTypes = collection.ListCreate (str20mBinType, strBasecodeType, strCurveAndTangentType, strLineSegmentType, strPricingZoneType, strProvisioningCentreType)
+-->
+	lisTMSSegmentTypes = collection.ListCreate (strPricingZoneType, strProvisioningCentreType)
+
+	estTMSAboveThreshold = event.CreateEmptyEventSet ()
+	
+	<!-- Loop through each set of segments and calculate TMS above threshold -->
+
+    intIndex = collection.Size (lisTMSSegmentTypes)
+	BeginLoopSegmentTMS:
+
+        intIndex = formula.Evaluate (forIndexDecrement, , "integer")
+        strSegmentType = collection.ListGet (lisTMSSegmentTypes, intIndex)
+		estSegments = collection.MapGet (mapAllSegmentations, strSegmentType)
+
+		<!-- Calculate TMS Left above thresholds -->
+
+		estTMSLeftAboveThreshold = script.Call ("subF-ThresholdAndCalculatePercentCovered", srmTMSLeft, lisLimLE300, strPctAbove300AttrName, estSegments)
+		estTMSLeftAboveThreshold = script.Call ("subF-ThresholdAndCalculatePercentCovered", srmTMSLeft, lisLimLE500, strPctAbove500AttrName, estTMSLeftAboveThreshold)
+		estTMSLeftAboveThreshold = script.Call ("subF-ThresholdAndCalculatePercentCovered", srmTMSLeft, lisLimLE700, strPctAbove700AttrName, estTMSLeftAboveThreshold)
+		estTMSLeftAboveThreshold = event.SetAttribute (estTMSLeftAboveThreshold, strRailAttrName, "Left")
+		estTMSLeftAboveThreshold = event.SetAttribute (estTMSLeftAboveThreshold, strSegmentationTypeAttrName, strSegmentType)
+
+		<!-- Calculate TMS Right above thresholds -->
+
+		estTMSRightAboveThreshold = script.Call ("subF-ThresholdAndCalculatePercentCovered", srmTMSRight, lisLimLE300, strPctAbove300AttrName, estSegments)
+		estTMSRightAboveThreshold = script.Call ("subF-ThresholdAndCalculatePercentCovered", srmTMSRight, lisLimLE500, strPctAbove500AttrName, estTMSRightAboveThreshold)
+		estTMSRightAboveThreshold = script.Call ("subF-ThresholdAndCalculatePercentCovered", srmTMSRight, lisLimLE700, strPctAbove700AttrName, estTMSRightAboveThreshold)
+		estTMSRightAboveThreshold = event.SetAttribute (estTMSRightAboveThreshold, strRailAttrName, "Right")
+		estTMSRightAboveThreshold = event.SetAttribute (estTMSRightAboveThreshold, strSegmentationTypeAttrName, strSegmentType)
+
+		<!-- Add events to TMS segments event set -->
+
+		estTMSAboveThreshold = event.Add (estTMSAboveThreshold, estTMSLeftAboveThreshold, estTMSRightAboveThreshold)
+
+        control.GoToIf ("$intIndex > 0", "BeginLoopSegmentTMS")
+
+	<!-- Format above threshold values to 2 decimal places for display -->
+
+	estTMSAboveThreshold = event.FormatAttribute (estTMSAboveThreshold, strDisplayPctAbove300AttrName, "%.2f", strPctAbove300AttrNameAsArgument)
+	estTMSAboveThreshold = event.FormatAttribute (estTMSAboveThreshold, strDisplayPctAbove500AttrName, "%.2f", strPctAbove500AttrNameAsArgument)
+	estTMSAboveThreshold = event.FormatAttribute (estTMSAboveThreshold, strDisplayPctAbove700AttrName, "%.2f", strPctAbove700AttrNameAsArgument)
+
+	<!-- Calculate start and end dates from survey date -->
+
+	estTMSAboveThreshold = event.SetAttribute (estTMSAboveThreshold, strSurveyNameAttrName, strSurvey)
+	estTMSAboveThreshold = event.SetAttribute (estTMSAboveThreshold, strSurveyDateAttrName, datSurvey)
+	estTMSAboveThreshold = event.CalculateAttribute (estTMSAboveThreshold, forAdd4Months, strEndDateAttrName, "date")
+	estTMSAboveThreshold = event.SetDatesToAttributes (estTMSAboveThreshold, strSurveyDateAttrName, strEndDateAttrName)
+	estTMSAboveThreshold = event.RemoveAttribute (estTMSAboveThreshold, strEndDateAttrName)
+
+    <!--
+    ##################################################################################################
+    Step 3 - Save data
+	  a. Delete any existing segments for this survey
+	  b. Save the new segments
+    ##################################################################################################
+    -->
+
+	 <!--event.DeleteByAttribute (strTwistCategory, , strSurveyNameAttrName, strSurvey) -->
+	 <!--event.DeleteByAttribute (strTMSCategory, , strSurveyNameAttrName, strSurvey) -->
+
+	estTMSAboveThreshold = event.FormatAttribute (estTMSAboveThreshold, strTypeAttrName, "%s - %s Segmentation", strRailAttrName, strSegmentationTypeAttrName)
+	 <!--event.Save (estAllMaxTwist, strTwistCategory, , strSegmentationTypeAttrName) -->
+	 <!--event.Save (estTMSAboveThreshold, strTMSCategory, , strTypeAttrName) -->
+
+console.ShowValue ("estAllMaxTwist", estAllMaxTwist)
+console.ShowValue ("estTMSAboveThreshold", estTMSAboveThreshold)
+
+
+  </Commands>
+
+<Function logged = "false">
+  <Name>subF-ThresholdAndCalculatePercentCovered</Name>
+
+  <Parameter required = "true">
+    <Name>srmInput</Name>
+    <Type>stream</Type>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>lisLimits</Name>
+    <Type>list</Type>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strAttrName</Name>
+    <Type>string</Type>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>estSegmentation</Name>
+    <Type>eventSet</Type>
+  </Parameter>
+
+  <Result>
+    <Name>estCoverage</Name>
+    <Type>eventSet</Type>
+  </Result>
+
+  <Commands>
+
+	uniMetre = unit.GetUnit ("Metric", "metre")
+
+	<!-- Formulas -->
+	
+	forPercentCovered = formula.Create ("'Covered Length' == null", "0.0", "100.0 * 'Covered Length'/'Length'")
+
+	estCoverage = event.SetAttributeToLength (estSegmentation, "Length", uniMetre)
+
+	estAboveLimit = stream.Threshold (srmInput, lisLimits, "Limit Name", "Limit Value")
+	estAboveLimit = event.SetAttributeToLength (estAboveLimit, "Length", uniMetre)
+
+	estCoverage = event.Aggregate (estCoverage, estAboveLimit, "Length", "Covered Length", "ProratedSum")
+	estCoverage = event.CalculateAttribute (estCoverage, forPercentCovered, strAttrName, "double")
+	
+	estCoverage = event.RemoveAttribute (estCoverage, "Length")
+	estCoverage = event.RemoveAttribute (estCoverage, "Covered Length")
+
+  </Commands>
+
+</Function>
+
+</Script>

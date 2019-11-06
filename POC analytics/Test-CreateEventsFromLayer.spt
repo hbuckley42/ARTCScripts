@@ -1,0 +1,32 @@
+<?xml version = "1.0" encoding = "utf-8" ?>
+
+<Script>
+  <Description>Tests create events from layer</Description>
+  <Version>1.1</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter>
+    <Name>strCorridor</Name>
+    <Type>string</Type>
+    <Source>corridor</Source>
+    <Alias>Corridor</Alias>
+    <Default>N40</Default>
+  </Parameter>
+
+  <Parameter>
+    <Name>strLayer</Name>
+    <Type>string</Type>
+    <Source>layer</Source>
+    <Alias>Layer</Alias>
+    <Default>Track Segment</Default>
+  </Parameter>
+
+  <Commands>
+
+	uniMetre = unit.GetUnit ("Metric", "metre")
+	estAssets = event.CreateEventsFromLayer (strCorridor, , , , , uniMetre, , 5.0, uniMetre, strLayer)
+	console.ShowValue ("estAssets", estAssets)
+
+  </Commands>
+
+</Script>

@@ -1,0 +1,66 @@
+<?xml version="1.1" encoding="ISO-8859-1"?>
+
+<Script>
+  <Description>Imports Survey</Description>
+  <Version>1.1</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+
+  <Parameter required = "true">
+    <Name>strUsername</Name>
+    <Type>string</Type>
+    <Source>user</Source>
+    <Default>DataAdmin</Default>
+    <Alias>User File Owner</Alias>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strDataFile</Name>
+    <Type>string</Type>
+    <Alias>File Name:</Alias>
+    <Source>userFile</Source>
+    <Default>import-data/stream/.*</Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strSuccessFolderName</Name>
+    <Type>string</Type>
+    <Alias>Success Folder Name:</Alias>
+    <Source>userFolder</Source>
+    <Default>processed-data/stream</Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+  </Parameter>
+
+  <Parameter required = "true">
+    <Name>strFailedFolderName</Name>
+    <Type>string</Type>
+    <Alias>Failed Folder Name:</Alias>
+    <Source>userFolder</Source>
+    <Default>failed-data/stream</Default>
+    <AssociatedParameter>strUsername</AssociatedParameter>
+
+
+    <!--
+    ##################################################################################################
+    Input:
+      Survey:           Imported survey name (as parameter)
+
+    Output:
+      Survey Name:      Imported survey name with IMP- prefix replaced with ALN-
+      Survey Type:      Aligned ICW
+      Channels:         Curvature
+	                    Twist 14m
+
+      Survey Name:      Renamed imported survey with IMP- prefix replaced with PRO-
+	  Survey Type:      AK Combined
+
+    ##################################################################################################
+    -->
+
+        <!--
+    ##################################################################################################
+    Initialise
+    ##################################################################################################
+    -->
+
+	<!-- Imported and Processed survey names and channels -->

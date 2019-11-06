@@ -1,0 +1,296 @@
+<?xml version = "1.0" encoding = "utf-8" ?>
+
+<Script>
+  <Version>1.0</Version>
+  <Copyright>2019 Bentley Systems, Incorporated. All rights reserved.</Copyright>
+  <Description>
+    TODO
+  </Description>
+
+  <Parameter>
+    <Name>strCorridor</Name>
+    <Type>string</Type>
+    <Source>corridor</Source>
+    <Alias>Line: </Alias>
+    <Default>10003</Default>
+  </Parameter>
+
+  <Parameter>
+    <Name>strExceptionCar</Name>
+    <Type>string</Type>
+    <Alias>Car:</Alias>
+    <Source>choice</Source>
+    <Choice>AK Car</Choice>
+    <Choice>SPENO</Choice>
+    <Choice>ICW</Choice>
+  </Parameter>
+
+  <Parameter>
+    <Name>strSegmentType</Name>
+    <Type>string</Type>
+    <Alias>Segment Type:</Alias>
+    <Source>choice</Source>
+    <Choice>100 metre</Choice>
+    <Choice>200 metre</Choice>
+    <Choice>Kilometre</Choice>
+    <Default>Kilometre</Default>
+  </Parameter>
+
+  <Parameter>
+    <Name>dblRepeatedExceptionWindow</Name>
+    <Type>double</Type>
+    <Alias>Repeated Exceptions Widow (metres):</Alias>
+    <Default>10</Default>
+  </Parameter>
+
+  <Parameter>
+    <Name>dblClusterWindow</Name>
+    <Type>double</Type>
+    <Alias>Cluster Window (metres):</Alias>
+    <Default>100</Default>
+  </Parameter>
+  <Commands>
+
+    <!--
+    ##################################################################################################
+   
+    ##################################################################################################    -->
+
+    test.FailIfNullOrEmpty (strSegmentType, "", "Please select a segment type")
+    test.FailIfNullOrEmpty (strExceptionCar, "", "Please select an Exception Type")
+
+    strSegmentCategoryName = util.Assign ("Segment")
+    strThresholdExceptionStatisticsCategory = util.Assign ("Threshold Exception Statistics")
+
+    strExceptionCategory = string.Format ("Exceedances %s", strExceptionCar)
+
+    strAttrDefectBand = util.Assign ("Defect Band")
+    strAttrFaultClass = util.Assign ("Fault Class")
+    strAttrObservationTypeDesc = util.Assign ("Observation Type Desc")
+
+    strAttrTotalCount  = util.Assign ("Total Number of Defects")
+
+    strAttrBandA = util.Assign ("Number of Defects Band A")
+    strAttrBandB = util.Assign ("Number of Defects Band B")
+    strAttrBandC = util.Assign ("Number of Defects Band C")
+    strAttrBandD = util.Assign ("Number of Defects Band D")
+    strAttrBandE = util.Assign ("Number of Defects Band E")
+    strAttrBandF = util.Assign ("Number of Defects Band F")
+    strAttrBandG = util.Assign ("Number of Defects Band G")
+    strAttrBandM = util.Assign ("Number of Defects Band M")
+    strAttrBandS = util.Assign ("Number of Defects Band S")
+    strAttrBandNaN = util.Assign ("Number of Defects Band Unknown")
+
+
+    strAttrFaultClassE1 = util.Assign ("Number of Faults Class E1")
+    strAttrFaultClassE2 = util.Assign ("Number of Faults Class E2")
+    strAttrFaultClassP1 = util.Assign ("Number of Faults Class P1")
+    strAttrFaultClassP2 = util.Assign ("Number of Faults Class P2")
+
+
+    strAttrRailLine   = util.Assign ("Number of Rail Line Exceedances")
+    strAttrRailTop    = util.Assign ("Number of Rail Top Exceedances")
+    strAttrTrackGauge = util.Assign ("Number of Track Gauge Exceedances")
+    strAttrTrackTwist = util.Assign ("Number of Track Twist Exceedances")
+    strAttrRailIntFlaw = util.Assign ("Number of Rail Int Flaw Exceedances")
+    strAttrAcceleration = util.Assign ("Number of Acceleration Exceedances")
+    strAttrBounce = util.Assign ("Number of Bounce Exceedances")
+    strAttrSuspensionCompression = util.Assign ("Number of Suspension Compression Exceedances")
+
+    strAttrRepeatCount = util.Assign ("Repeat Count")
+    strAttrClusterCount = util.Assign ("Cluster Count")
+    strAttrSurveyDate = util.Assign ("Survey Date")
+
+    <!--
+    ##################################################################################################
+      Units Definition
+    ################################################################################################## -->
+    uniMetre = unit.GetUnit ("Metric", "metre")
+
+    <!--
+    ###################################################################################################################
+      Processing Step 1 - Load  Data
+    ###################################################################################################################-->
+
+    estStatistics = event.LoadByCorridor (strSegmentCategoryName, strSegmentType, , , strCorridor)
+    estExceptions = event.LoadByCorridor (strExceptionCategory, , , strCorridor)
+
+    strDayBeforeSurveyDate = string.Format ("AddDays('%s', 1)", strAttrSurveyDate)
+    forDayBeforeSurveyDate = formula.Create (strDayBeforeSurveyDate)
+
+
+    <!--
+    ###################################################################################################################
+      Processing Step 3 - Calculate Repeated Exceptions
+    ###################################################################################################################-->
+    strAttrTempStartDate = util.Assign ("Temp Start Date")
+    forHalfRepWindow = formula.Create ("$dblRepeatedExceptionWindow/2")
+    dblRepeatedExceptionWindow = formula.Evaluate (forHalfRepWindow, , "double")
+
+    estRepeatedExceptions = event.SetAttributeToStartDate (estExceptions, strAttrSurveyDate)
+    estRepeatedExceptionsToCount = event.CalculateAttribute (estRepeatedExceptions, forDayBeforeSurveyDate, strAttrTempStartDate, "date")
+    estRepeatedExceptionsToCount = event.SetDatesToAttributes (estRepeatedExceptionsToCount, strAttrTempStartDate, strAttrTempStartDate)
+    estRepeatedExceptionsToCount = event.Dilate (estRepeatedExceptionsToCount, dblRepeatedExceptionWindow, uniMetre)
+
+    estRepeatedExceptions = event.SetAttribute (estRepeatedExceptions, strAttrTempStartDate, 01-01-1900)
+    estRepeatedExceptions = event.SetStartDateToAttribute (estRepeatedExceptions, strAttrTempStartDate)
+    estRepeatedExceptions = event.Aggregate (estRepeatedExceptions, estRepeatedExceptionsToCount, strAttrObservationTypeDesc, strAttrRepeatCount, "Count", "Within")
+    estRepeatedExceptions = event.SetStartDateToAttribute (estRepeatedExceptions, strAttrSurveyDate)
+    estRepeatedExceptions = event.RemoveAttribute (estRepeatedExceptions, strAttrTempStartDate)
+    estRepeatedExceptions = event.RemoveAttribute (estRepeatedExceptions, strAttrSurveyDate)
+
+    <!--
+    ###################################################################################################################
+      Processing Step 4 - Calculate Repeated Exceptions
+    ###################################################################################################################-->
+    forHalfClusterWindow= formula.Create ("$dblClusterWindow/2")
+    dblClusterWindow = formula.Evaluate (forHalfClusterWindow, , "double")
+    estCluster = event.Dilate (estExceptions, dblClusterWindow, uniMetre)
+    estRepeatedExceptions = event.Aggregate (estRepeatedExceptions, estCluster, strAttrObservationTypeDesc, strAttrClusterCount, "Count", "Within")
+
+    <!--
+    ###################################################################################################################
+      Processing Step 2 - Calculate Statistics
+    ###################################################################################################################-->
+    estStatistics = event.Aggregate (estStatistics, estExceptions, strAttrDefectBand, strAttrTotalCount, "Count")
+
+    estStatistics = script.Call ("subF-CountEventsPerAttribute", estStatistics, estExceptions, "A", strAttrDefectBand, strAttrBandA)
+
+    estStatistics = script.Call ("subF-CountEventsPerAttribute", estStatistics, estExceptions, "B", strAttrDefectBand, strAttrBandB)
+    estStatistics = script.Call ("subF-CountEventsPerAttribute", estStatistics, estExceptions, "C", strAttrDefectBand, strAttrBandC)
+    estStatistics = script.Call ("subF-CountEventsPerAttribute", estStatistics, estExceptions, "D", strAttrDefectBand, strAttrBandD)
+    estStatistics = script.Call ("subF-CountEventsPerAttribute", estStatistics, estExceptions, "E", strAttrDefectBand, strAttrBandE)
+    estStatistics = script.Call ("subF-CountEventsPerAttribute", estStatistics, estExceptions, "F", strAttrDefectBand, strAttrBandF)
+    estStatistics = script.Call ("subF-CountEventsPerAttribute", estStatistics, estExceptions, "G", strAttrDefectBand, strAttrBandG)
+    estStatistics = script.Call ("subF-CountEventsPerAttribute", estStatistics, estExceptions, "M", strAttrDefectBand, strAttrBandM)
+    estStatistics = script.Call ("subF-CountEventsPerAttribute", estStatistics, estExceptions, "S", strAttrDefectBand, strAttrBandS)
+    estStatistics = script.Call ("subF-CountEventsPerAttribute", estStatistics, estExceptions, "NULL", strAttrDefectBand, strAttrBandNaN)
+
+    estStatistics = script.Call ("subF-CountEventsPerAttribute", estStatistics, estExceptions, "E1", strAttrFaultClass, strAttrFaultClassE1)
+    estStatistics = script.Call ("subF-CountEventsPerAttribute", estStatistics, estExceptions, "E2", strAttrFaultClass, strAttrFaultClassE2)
+    estStatistics = script.Call ("subF-CountEventsPerAttribute", estStatistics, estExceptions, "P1", strAttrFaultClass, strAttrFaultClassP1)
+    estStatistics = script.Call ("subF-CountEventsPerAttribute", estStatistics, estExceptions, "P2", strAttrFaultClass, strAttrFaultClassP2)
+
+    <!-- Stats per measurement type -->
+
+    control.GoToIf ("$strExceptionCar != \"AK Car\"", "SPENO")
+
+    estStatistics = script.Call ("subF-CountEventsPerAttribute", estStatistics, estExceptions, "Rail Line", strAttrObservationTypeDesc, strAttrRailLine)
+    estStatistics = script.Call ("subF-CountEventsPerAttribute", estStatistics, estExceptions, "Rail Top", strAttrObservationTypeDesc, strAttrRailTop)
+    estStatistics = script.Call ("subF-CountEventsPerAttribute", estStatistics, estExceptions, "Track Gauge", strAttrObservationTypeDesc, strAttrTrackGauge)
+    estStatistics = script.Call ("subF-CountEventsPerAttribute", estStatistics, estExceptions, "Track Twist", strAttrObservationTypeDesc, strAttrTrackTwist)
+    control.GoTo ("finale")
+
+    SPENO:
+    control.GoToIf ("$strExceptionCar != \"SPENO\"", "ICW")
+    estStatistics = script.Call ("subF-CountEventsPerAttribute", estStatistics, estExceptions, "Rail Int Flaw", strAttrObservationTypeDesc, strAttrRailIntFlaw)
+    control.GoTo ("finale")
+
+    ICW:
+    control.GoToIf ("$strExceptionCar != \"ICW\"", "finale")
+    estStatistics = script.Call ("subF-CountEventsPerAttribute", estStatistics, estExceptions, "Acceleration", strAttrObservationTypeDesc, strAttrAcceleration)
+    estStatistics = script.Call ("subF-CountEventsPerAttribute", estStatistics, estExceptions, "Bounce", strAttrObservationTypeDesc, strAttrBounce)
+    estStatistics = script.Call ("subF-CountEventsPerAttribute", estStatistics, estExceptions, "Suspension Compression", strAttrObservationTypeDesc, strAttrSuspensionCompression)
+    control.GoTo ("finale")
+
+
+    <!--
+    ###################################################################################################################
+      Processing Step 5 - Delete old SDs and save new
+    ################################################################################################################### -->
+    finale:
+    event.DeleteByCorridor (strThresholdExceptionStatisticsCategory, strExceptionCar, , , strCorridor)
+    event.Save (estStatistics, strThresholdExceptionStatisticsCategory, strExceptionCar)
+
+    event.DeleteByCorridor (strExceptionCategory, , , strCorridor)
+    event.Save (estRepeatedExceptions, strExceptionCategory, , strAttrObservationTypeDesc)
+
+
+    <!-- TODO: Move to a release script -->
+    strThresholdExceptionStatisticsLayer = string.Append ("Threshold Exception Statistics")
+    layer.CreateEventLayer (strThresholdExceptionStatisticsLayer, strThresholdExceptionStatisticsCategory, strExceptionCar)
+
+
+    end:
+  </Commands>
+
+  <Function logged = "false">
+    <Name>subF-CountEventsPerAttribute</Name>
+    <Description>Aggregate events with Count option</Description>
+
+    <Parameter>
+      <Name>estMask</Name>
+      <Type>eventSet</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>estToAggregate</Name>
+      <Type>eventSet</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>oValueToMatch</Name>
+      <Type>object</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strSourceAttribute</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strTargetAttribute</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Result>
+      <Name>estResult</Name>
+      <Type>eventSet</Type>
+    </Result>
+
+    <Commands>
+      estResult = script.Call("subF-FilterEqualValues", estToAggregate, oValueToMatch, strSourceAttribute)
+      estResult =  event.Aggregate (estMask, estResult, strSourceAttribute, strTargetAttribute, "Count")
+    </Commands>
+
+  </Function>
+
+
+  <Function logged = "false">
+    <Name>subF-FilterEqualValues</Name>
+    <Description>Filters events with attribute values that are equal a given value to match</Description>
+
+    <Parameter>
+      <Name>estToFilter</Name>
+      <Type>eventSet</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>oValueToMatch</Name>
+      <Type>object</Type>
+    </Parameter>
+
+    <Parameter>
+      <Name>strAttributeName</Name>
+      <Type>string</Type>
+    </Parameter>
+
+    <Result>
+      <Name>estResult</Name>
+      <Type>eventSet</Type>
+    </Result>
+
+    <Commands>
+
+      filEquals = filter.CreateEqualsFilter (oValueToMatch)
+      atrFilEQ = filter.CreateAttributeFilter (strAttributeName, filEquals)
+
+      evtFilEquals = filter.CreateEventValueFilter (atrFilEQ)
+      estResult = event.Filter (estToFilter, evtFilEquals)
+
+      end:
+
+    </Commands>
+  </Function>
+
+</Script>
